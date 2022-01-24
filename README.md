@@ -44,7 +44,7 @@ pip install biopython
 
 **Example**
 
-Analyze of an example wild-type *Arabidopsis thaliana* Col-0 dataset (ERR6210723, 14.6 Gb, Naish et al., 2021, Science): 
+Analyze of an example wild-type *Arabidopsis thaliana* Col-0 dataset (ERR6210723, 14.6 Gb, [Naish et al., 2021, Science](https://www.science.org/doi/10.1126/science.abi7489)): 
 
 ```bash
 cd hifisr/pre
