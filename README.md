@@ -42,9 +42,9 @@ export PATH=/mnt/e/02.vol1/03.work/03.HiFi/hifisr/deps/minimap2-2.24_x64-linux:$
 pip install biopython
 ```
 
-**Example**
+**Example 1**
 
-Analyze of an example wild-type *Arabidopsis thaliana* Col-0 dataset (ERR6210723, 14.6 Gb, [Naish et al., 2021, Science](https://www.science.org/doi/10.1126/science.abi7489)): 
+Analyze of an example wild-type *Arabidopsis thaliana* dataset Col-CEN ([ERR6210723](https://www.ncbi.nlm.nih.gov/sra/ERR6210723), 14.6 Gb, [Naish et al., 2021, Science](https://www.science.org/doi/10.1126/science.abi7489)):
 
 ```bash
 cd hifisr/pre
@@ -59,3 +59,22 @@ ln -sf refs_cp28673mod.id_plastid.fas CEN_plastid.fa
 bash ../../run_hifisr.sh CEN 16 fastq &
 
 ```
+
+**Example 2**
+
+Analyze of an example wild-type *Arabidopsis thaliana* dataset Col-XJTU ([CRR302668](https://ngdc.cncb.ac.cn/gsa/browse/CRA004538/CRR302668), 22.9 Gb, [Wang et al., 2021, GPB](https://www.sciencedirect.com/science/article/pii/S1672022921001741)):
+
+```bash
+cd hifisr/pre
+mkdir XJTU  # XJTU is the sample name
+cd XJTU
+pigz -d -k -p 16 CRR302668.fastq.gz
+ln -sf CRR302668.fastq XJTU.fastq
+# manually change the FASTA headers of mitochondrial and plastid genome refercences into mito and plastid for easily manipulation
+cat Athaliana_447_TAIR10.id_Chr{1,2,3,4,5}.fa refs_cp28673mod.id_mito.fas refs_cp28673mod.id_plastid.fas > XJTU_ref.fa
+ln -sf refs_cp28673mod.id_mito.fas XJTU_mito.fa
+ln -sf refs_cp28673mod.id_plastid.fas XJTU_plastid.fa
+bash ../../run_hifisr.sh XJTU 16 fastq &
+```
+
+**Merge reports of multiple samples**
