@@ -39,7 +39,7 @@ export PATH=/mnt/e/02.vol1/03.work/03.HiFi/hifisr/deps/minimap2-2.24_x64-linux:$
 * Install required Python packages
 
 ```bash
-pip install biopython
+pip install biopython pandas openpyxl
 ```
 
 **Example 1**
@@ -78,3 +78,12 @@ bash ../../run_hifisr.sh XJTU 16 fastq &
 ```
 
 **Merge reports of multiple samples**
+
+Merge reports of Col-CEN and Col-XJTU:
+
+```bash
+cd hifisr/pre
+echo CEN >> merge_1.txt
+echo XJTU >> merge_1.txt
+python ../scripts/merge.py merge_1
+```
