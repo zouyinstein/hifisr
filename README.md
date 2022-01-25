@@ -85,5 +85,5 @@ Merge reports of Col-CEN and Col-XJTU:
 cd hifisr/pre
 echo CEN >> merge_1.txt
 echo XJTU >> merge_1.txt
-python ../scripts/merge.py merge_1
+bash ../run_merge.sh merge_1
 ```
