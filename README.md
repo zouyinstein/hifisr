@@ -110,29 +110,3 @@ echo XJTU >> merge_1.txt
 # check export PATH=/mnt/e/02.vol1/03.work/03.HiFi/hifisr/deps/minimap2-2.24_x64-linux:$PATH
 python ../../hifisr.py -m merge1 merge &
 ```
-
-**Parameters**
-
-```bash
-./hifisr.py -h
-```
-
-usage: hifisr.py [-h] [-s str] [-t int] [-i str] [-n int] [-m str] mode
-
-The Python user interface of the HiFi-SR pipeline
-
-positional arguments:
-  mode                  "single" to run hifisr for each sample; "merge" to merge results of multiple samples
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -s str, --sample_name str
-                        In "single" mode, sample name, for example sample_1 (default: )
-  -t int, --num_of_thread int
-                        In "single" mode, number of threads to run the pipeline (default: 8)
-  -i str, --input_type str
-                        In "single" mode, input file type fastq or fasta (default: fastq)
-  -n int, --type_number int
-                        In "single" mode, analyze reads up to four rearrangements in a single read (default: 5)
-  -m str, --samples_txt_prefix str
-                        In "merge" mode, prefix of txt file containing multiple sample names, for example "merge_1" (default: )
