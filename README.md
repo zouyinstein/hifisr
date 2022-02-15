@@ -53,7 +53,8 @@ pigz -d -p 8 *.gz
 # check export PATH=/mnt/e/02.vol1/03.work/03.HiFi/hifisr/deps/minimap2-2.24_x64-linux:$PATH
 python ../../hifisr.py -s Col single &
 # OR python ../../hifisr.py -s Col -t 16 -i fastq single &
-# clean results except for the start fold and its contents if you want to rerun the test
+# clean results if you want to rerun the test
+rm -rf Col
 ```
 
 
