@@ -90,7 +90,6 @@ def main() -> None:
         print()
         print("Missing sample name")
         print()
-        ret = subprocess.call(f"python ../../hifisr.py -h python || hifisr.py", shell=True)
         exit()
     elif mode_arg == "single":
         print()
@@ -105,7 +104,6 @@ def main() -> None:
         print()
         print("Missing txt file prefix")
         print()
-        ret = subprocess.call(f"python ../../hifisr.py -h python || hifisr.py", shell=True)
         exit()
     elif mode_arg == "merge":
         print()
