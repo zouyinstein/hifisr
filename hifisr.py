@@ -13,8 +13,8 @@ import subprocess
 class Args(NamedTuple):
     """ Command-line arguments """
     mode: str   # single or merge
-    sample: str
-    thread: int
+    sample_name: str
+    num_of_thread: int
     input_type: str
     type_number: int
     samples_txt_prefix: str
@@ -35,14 +35,14 @@ def get_args() -> Args:
                         help='"single" to run hifisr for each sample; "merge" to merge results of multiple samples')
 
     parser.add_argument('-s',
-                        '--sample',
+                        '--sample_name',
                         help='In "single" mode, sample name, for example sample_1',
                         metavar='str',
                         type=str,
                         default='')
 
     parser.add_argument('-t',
-                        '--thread',
+                        '--num_of_thread',
                         help='In "single" mode, number of threads to run the pipeline',
                         metavar='int',
                         type=int,
@@ -50,7 +50,7 @@ def get_args() -> Args:
 
     parser.add_argument('-i',
                         '--input_type',
-                        help='In "single" mode, fastq or fasta',
+                        help='In "single" mode, input file type fastq or fasta',
                         metavar='str',
                         type=str,
                         default='fastq')
@@ -71,7 +71,7 @@ def get_args() -> Args:
 
     args = parser.parse_args()
 
-    return Args(args.mode, args.sample, args.thread, args.input_type, args.type_number, args.samples_txt_prefix)
+    return Args(args.mode, args.sample_name, args.num_of_thread, args.input_type, args.type_number, args.samples_txt_prefix)
 
 # --------------------------------------------------
 
@@ -80,8 +80,8 @@ def main() -> None:
 
     args = get_args()
     mode_arg = args.mode
-    sample_arg = args.sample
-    thread_arg = args.thread
+    sample_arg = args.sample_name
+    thread_arg = args.num_of_thread
     input_type_arg = args.input_type
     type_number_arg = args.type_number
     samples_txt_prefix_arg = args.samples_txt_prefix
