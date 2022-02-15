@@ -45,18 +45,19 @@ pip install biopython pandas openpyxl
 **Test**
 
 ```bash
-cd hifisr/test
+git clone https://github.com/zouyinstein/hifisr
+conda activate hifisr
+cd hifisr
+export PATH="$PWD/deps/minimap2-2.24_x64-linux":$PATH
+cd test
 cp -R start Col
 cd Col
 pigz -d -p 8 *.gz
-# check conda activate hifisr
-# check export PATH=/mnt/e/02.vol1/03.work/03.HiFi/hifisr/deps/minimap2-2.24_x64-linux:$PATH
 python ../../hifisr.py -s Col single &
 # OR python ../../hifisr.py -s Col -t 16 -i fastq single &
 # clean results if you want to rerun the test
 rm -rf Col
 ```
-
 
 **Example 1**
 
