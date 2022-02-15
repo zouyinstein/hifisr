@@ -87,20 +87,34 @@ def main() -> None:
     samples_txt_prefix_arg = args.samples_txt_prefix
 
     if mode_arg == "single" and sample_arg == "":
+        print()
         print("Missing sample name")
+        print()
+        ret = subprocess.call(f"python ../../hifisr.py -h python || hifisr.py", shell=True)
         exit()
     elif mode_arg == "single":
+        print()
         print(f"Running HiFi-SR pipeline for {sample_arg}")
+        print()
         ret = subprocess.call(f"bash ../../scripts/run_stage_all.sh {sample_arg} {thread_arg} {input_type_arg}", shell=True)
+        print()
         print(f"Finished running HiFi-SR for {sample_arg}!")
+        print()
 
     if mode_arg == "merge" and samples_txt_prefix_arg == "":
+        print()
         print("Missing txt file prefix")
+        print()
+        ret = subprocess.call(f"python ../../hifisr.py -h python || hifisr.py", shell=True)
         exit()
     elif mode_arg == "merge":
+        print()
         print(f"Merge HiFi-SR reports for multiple samples in {samples_txt_prefix_arg}")
-        ret = subprocess.call(f"bash ../scripts/merge_samples.sh {samples_txt_prefix_arg}", shell=True)    
+        print()
+        ret = subprocess.call(f"bash ../scripts/merge_samples.sh {samples_txt_prefix_arg}", shell=True)
+        print()  
         print(f"Finished merging {samples_txt_prefix_arg}!")
+        print()
 
 # --------------------------------------------------
 
