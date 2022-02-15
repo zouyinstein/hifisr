@@ -56,7 +56,9 @@ ln -sf ERR6210723.fastq CEN.fastq
 cat Athaliana_447_TAIR10.id_Chr{1,2,3,4,5}.fa refs_cp28673mod.id_mito.fas refs_cp28673mod.id_plastid.fas > CEN_ref.fa
 ln -sf refs_cp28673mod.id_mito.fas CEN_mito.fa
 ln -sf refs_cp28673mod.id_plastid.fas CEN_plastid.fa
-bash ../../run_hifisr.sh CEN 16 fastq &
+# check conda activate hifisr
+# check export PATH=/mnt/e/02.vol1/03.work/03.HiFi/hifisr/deps/minimap2-2.24_x64-linux:$PATH
+python ../../hifisr.py -s CEN -t 10 -i fastq single &
 
 ```
 
@@ -74,7 +76,9 @@ ln -sf CRR302668.fastq XJTU.fastq
 cat Athaliana_447_TAIR10.id_Chr{1,2,3,4,5}.fa refs_cp28673mod.id_mito.fas refs_cp28673mod.id_plastid.fas > XJTU_ref.fa
 ln -sf refs_cp28673mod.id_mito.fas XJTU_mito.fa
 ln -sf refs_cp28673mod.id_plastid.fas XJTU_plastid.fa
-bash ../../run_hifisr.sh XJTU 16 fastq &
+# check conda activate hifisr
+# check export PATH=/mnt/e/02.vol1/03.work/03.HiFi/hifisr/deps/minimap2-2.24_x64-linux:$PATH
+python ../../hifisr.py -s XJTU -t 10 -i fastq single &
 ```
 
 **Merge reports of multiple samples**
@@ -85,5 +89,7 @@ Merge reports of Col-CEN and Col-XJTU:
 cd hifisr/pre
 echo CEN >> merge_1.txt
 echo XJTU >> merge_1.txt
-bash ../run_merge.sh merge_1
+# check conda activate hifisr
+# check export PATH=/mnt/e/02.vol1/03.work/03.HiFi/hifisr/deps/minimap2-2.24_x64-linux:$PATH
+python ../../hifisr.py -m merge1 merge &
 ```
