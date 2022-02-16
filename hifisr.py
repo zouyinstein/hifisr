@@ -20,7 +20,6 @@ class Args(NamedTuple):
     samples_txt_prefix: str
 
 # --------------------------------------------------
-
 def get_args() -> Args:
     """ Get command-line arguments """
 
@@ -76,16 +75,17 @@ def get_args() -> Args:
 # --------------------------------------------------
 
 def main() -> None:
-    """ Make a jazz noise here """
+    """Run HiFi-SP pipeline in for a single sample, OR merge reports for multiple samples."""
 
     args = get_args()
     mode_arg = args.mode
     sample_arg = args.sample_name
     thread_arg = args.num_of_thread
     input_type_arg = args.input_type
-    type_number_arg = args.type_number
+    # type_number_arg = args.type_number
     samples_txt_prefix_arg = args.samples_txt_prefix
-
+    
+    # for "single" mode
     if mode_arg == "single" and sample_arg == "":
         print()
         print("Missing sample name")
@@ -100,6 +100,7 @@ def main() -> None:
         print(f"Finished running HiFi-SR for {sample_arg}!")
         print()
 
+    # for "merge" mode
     if mode_arg == "merge" and samples_txt_prefix_arg == "":
         print()
         print("Missing txt file prefix")
