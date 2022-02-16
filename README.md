@@ -33,7 +33,6 @@ ln -sf /home/zouyi/.conda/envs/hifisr/lib/libcrypto.so.1.1 /home/zouyi/.conda/en
 cd hifisr/deps
 curl -L https://github.com/lh3/minimap2/releases/download/v2.24/minimap2-2.24_x64-linux.tar.bz2 | tar -jxvf -
 ./minimap2-2.24_x64-linux/minimap2
-export PATH=/mnt/e/02.vol1/03.work/03.HiFi/hifisr/deps/minimap2-2.24_x64-linux:$PATH
 ```
 
 * Install required Python packages
@@ -45,14 +44,22 @@ pip install biopython pandas openpyxl
 **Test**
 
 ```bash
-git clone https://github.com/zouyinstein/hifisr
-conda activate hifisr
+# Make sure the HiFi-SR repository has been downloaded (git clone https://github.com/zouyinstein/hifisr).
+# Make sure the hifisr environment has been activated (conda activate hifisr).
+# Make sure the dependent third-party softwares/packages has been installed.
+# Change working directory to hifisr
 cd hifisr
+# Add minimap2 executable to the system PATH
 export PATH="$PWD/deps/minimap2-2.24_x64-linux":$PATH
+# Change working directory to test
 cd test
+# Copy the Arabidopsis thaliana (Col-0) reference and demo HiFi reads to a new directory Col
 cp -R start Col
+# Change working directory to the new directory Col
 cd Col
+# unzip the files
 pigz -d -p 8 *.gz
+# Run the HiFi-SR pipeline for Col
 python ../../hifisr.py -s Col single &
 # OR python ../../hifisr.py -s Col -t 16 -i fastq single &
 # clean results if you want to rerun the test
@@ -74,7 +81,7 @@ cat Athaliana_447_TAIR10.id_Chr{1,2,3,4,5}.fa refs_cp28673mod.id_mito.fas refs_c
 ln -sf refs_cp28673mod.id_mito.fas CEN_mito.fa
 ln -sf refs_cp28673mod.id_plastid.fas CEN_plastid.fa
 # check conda activate hifisr
-# check export PATH=/mnt/e/02.vol1/03.work/03.HiFi/hifisr/deps/minimap2-2.24_x64-linux:$PATH
+# check export PATH=/path/to/hifisr/deps/minimap2-2.24_x64-linux:$PATH
 python ../../hifisr.py -s CEN -t 10 -i fastq single &
 
 ```
@@ -94,7 +101,7 @@ cat Athaliana_447_TAIR10.id_Chr{1,2,3,4,5}.fa refs_cp28673mod.id_mito.fas refs_c
 ln -sf refs_cp28673mod.id_mito.fas XJTU_mito.fa
 ln -sf refs_cp28673mod.id_plastid.fas XJTU_plastid.fa
 # check conda activate hifisr
-# check export PATH=/mnt/e/02.vol1/03.work/03.HiFi/hifisr/deps/minimap2-2.24_x64-linux:$PATH
+# check export PATH=/path/to/hifisr/deps/minimap2-2.24_x64-linux:$PATH
 python ../../hifisr.py -s XJTU -t 10 -i fastq single &
 ```
 
@@ -107,6 +114,6 @@ cd hifisr/pre
 echo CEN >> merge_1.txt
 echo XJTU >> merge_1.txt
 # check conda activate hifisr
-# check export PATH=/mnt/e/02.vol1/03.work/03.HiFi/hifisr/deps/minimap2-2.24_x64-linux:$PATH
+# check export PATH=/path/to/hifisr/deps/minimap2-2.24_x64-linux:$PATH
 python ../../hifisr.py -m merge1 merge &
 ```
