@@ -24,7 +24,8 @@ conda activate hifisr
 ```bash
 conda install pigz -c conda-forge
 conda install samtools bamtools blast seqkit -c bioconda
-ln -sf /home/zouyi/.conda/envs/hifisr/lib/libcrypto.so.1.1 /home/zouyi/.conda/envs/hifisr/lib/libcrypto.so.1.0.0  # create a soft link
+# create a soft link to ensure samtools can work
+ln -sf /home/zouyi/.conda/envs/hifisr/lib/libcrypto.so.1.1 /home/zouyi/.conda/envs/hifisr/lib/libcrypto.so.1.0.0  
 ```
 
 * Install minimap2
