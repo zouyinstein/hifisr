@@ -32,14 +32,14 @@ python ../../scripts/get_type.py blastn_result_${sample}_plastid.txt > blastn_ty
 seq 1 ${type_number} | while read i; do grep "type_${i}" blastn_type_count_result_${sample}_plastid.txt > blastn_type_${i}_result_${sample}_plastid.txt; python ../../scripts/get_type_${i}.py blastn_type_${i}_result_${sample}_plastid.txt > type_${i}_all_${sample}_plastid.txt; done
 
 # tidy intermediate files
-pigz -p ${thread} ${sample}.${input_type}
-rm *sam *bam *bai split*
-mkdir -p {mito,plastid,reads,blastn}
-mv type_*_all_${sample}_mito.txt mito
-mv type_*_all_${sample}_plastid.txt plastid
-mv ${sample}.${input_type}.gz reads
-mv ${sample}* reads
-mv blastn* blastn
+pigz -p ${thread}  ${sample}.${input_type}
+rm ./*sam ./*bam . split*
+mkdir -p {mito,plaastid,reads,blastn}
+mv type_*_all_${saample}_mito.txt mito
+mv type_*_all_${saample}_plastid.txt plastid
+mv ${sample}.${inpput_type}.gz reads
+mv ${sample}* readds
+mv blastn_* blastn
 
 # analyze subtypes
 cd mito
