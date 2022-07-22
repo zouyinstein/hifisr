@@ -61,8 +61,8 @@ cd Col
 # unzip the files
 pigz -d -p 8 *.gz
 # Run the HiFi-SR pipeline for Col
-python ../../hifisr.py -s Col single &
-# OR python ../../hifisr.py -s Col -t 16 -i fastq single &
+python ../../hifisr.py -s Col single > $(date +%s).log 2> $(date +%s).err &
+# OR python ../../hifisr.py -s Col -t 16 -i fastq single > $(date +%s).log 2> $(date +%s).err &
 # clean results if you want to rerun the test
 rm -rf Col
 ```
@@ -83,7 +83,7 @@ ln -sf refs_cp28673mod.id_mito.fas CEN_mito.fa
 ln -sf refs_cp28673mod.id_plastid.fas CEN_plastid.fa
 # check conda activate hifisr
 # check export PATH=/path/to/hifisr/deps/minimap2-2.24_x64-linux:$PATH
-python ../../hifisr.py -s CEN -t 10 -i fastq single &
+python ../../hifisr.py -s CEN -t 10 -i fastq single > $(date +%s).log 2> $(date +%s).err &
 
 ```
 
@@ -103,7 +103,7 @@ ln -sf refs_cp28673mod.id_mito.fas XJTU_mito.fa
 ln -sf refs_cp28673mod.id_plastid.fas XJTU_plastid.fa
 # check conda activate hifisr
 # check export PATH=/path/to/hifisr/deps/minimap2-2.24_x64-linux:$PATH
-python ../../hifisr.py -s XJTU -t 10 -i fastq single &
+python ../../hifisr.py -s XJTU -t 10 -i fastq single > $(date +%s).log 2> $(date +%s).err &
 ```
 
 **Merge reports of multiple samples**
@@ -116,5 +116,5 @@ echo CEN >> merge_1.txt
 echo XJTU >> merge_1.txt
 # check conda activate hifisr
 # check export PATH=/path/to/hifisr/deps/minimap2-2.24_x64-linux:$PATH
-python ../../hifisr.py -m merge1 merge &
+python ../../hifisr.py -m merge1 merge > $(date +%s).log 2> $(date +%s).err &
 ```
