@@ -100,6 +100,21 @@ def main() -> None:
         print(f"Finished running HiFi-SR for {sample_arg}!")
         print()
 
+    # for "wp2" mode
+    if mode_arg == "wp2" and sample_arg == "":
+        print()
+        print("Missing sample name")
+        print()
+        exit()
+    elif mode_arg == "wp2":
+        print()
+        print(f"Running HiFi-SR pipeline for {sample_arg}, mapping reads by winnowmap2")
+        print()
+        ret = subprocess.call(f"bash ../../scripts/run_stage_wp2.sh {sample_arg} {thread_arg} {input_type_arg}", shell=True)
+        print()
+        print(f"Finished running HiFi-SR for {sample_arg}!")
+        print()
+
     # for "merge" mode
     if mode_arg == "merge" and samples_txt_prefix_arg == "":
         print()
