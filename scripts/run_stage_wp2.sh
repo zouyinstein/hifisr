@@ -34,11 +34,11 @@ seq 1 ${type_number} | while read i; do grep "type_${i}" blastn_type_count_resul
 # tidy intermediate files
 pigz -p ${thread}  ${sample}.${input_type}
 rm ./*sam ./*bam . split*
-mkdir -p {mito,plaastid,reads,blastn}
-mv type_*_all_${saample}_mito.txt mito
-mv type_*_all_${saample}_plastid.txt plastid
-mv ${sample}.${inpput_type}.gz reads
-mv ${sample}* readds
+mkdir -p {mito,plastid,reads,blastn}
+mv type_*_all_${sample}_mito.txt mito
+mv type_*_all_${sample}_plastid.txt plastid
+mv ${sample}.${input_type}.gz reads
+mv ${sample}* reads
 mv blastn_* blastn
 
 # analyze subtypes
