@@ -96,9 +96,6 @@ def get_blastn_info(blast_record):
 if __name__ == "__main__":
     result_handle = open(sys.argv[1])
     ref_length = len(SeqIO.read(sys.argv[2], "fasta").seq)
-    if sys.argv[2].endswith("_plastid.fa"):
-        # Currently, do not merge cross-border reads for platid genome because of the very large repeat IRb.
-        ref_length = 1000000
     blast_records = list(NCBIXML.parse(result_handle))
     for blast_record in blast_records:
         # get info from one  record
