@@ -38,7 +38,7 @@ class Blastn_info():
                             self.alignments.pop(i)
                         else:
                             self.alignments.pop(i)
-                            self.alignments.pop(i)
+                            self.alignments.pop(j)
                         self.alignments.append(("Minus", merged_query_start, merged_query_end, merged_sbjct_start, merged_sbjct_end))
                         return
 
