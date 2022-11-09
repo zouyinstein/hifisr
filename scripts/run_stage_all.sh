@@ -27,12 +27,14 @@ python ../../scripts/write_blastn_commands.py ${sample} mito
 python ../../scripts/write_blastn_commands.py ${sample} plastid
 find mito_commands/ -name "*sh" > mito_commands.txt
 find plastid_commands/ -name "*sh" > plastid_commands.txt
-cat mito_commands.txt | parallel '{}' -j ${thread}
-cat plastid_commands.txt | parallel '{}' -j ${thread}
+cat mito_commands.txt | while read i; do echo "sh " $i >> mito_commands.list; done
+cat plastid_commands.txt | while read i; do echo "sh " $i >> plastid_commands.list; done
+cat mito_commands.list | parallel '{}' -j ${thread}
+cat plastid_commands.list | parallel '{}' -j ${thread}
 find tmp/ -name "blastn_*mito*.txt" > blastn_${sample}_mito.list
-cat blastn_${sample}_mito.txt | while read i; do cat $i >> blastn_result_${sample}_mito.txt
+cat blastn_${sample}_mito.txt | while read i; do cat $i >> blastn_result_${sample}_mito.txt; done
 find tmp/ -name "blastn_*plastid*.txt" > blastn_${sample}_plastid.list
-cat blastn_${sample}_plastid.txt | while read i; do cat $i >> blastn_result_${sample}_plastid.txt
+cat blastn_${sample}_plastid.txt | while read i; do cat $i >> blastn_result_${sample}_plastid.txt; done
 
 # process combined blastn results
 python ../../scripts/get_type.py blastn_result_${sample}_mito.txt > blastn_type_count_result_${sample}_mito.txt
