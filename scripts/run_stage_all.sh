@@ -23,8 +23,8 @@ grep "^>" ${sample}.sorted.REF_plastid.fasta | tr -d '>' > all_plastid.ids
 mkdir mito_commands plastid_commands tmp
 seqkit split -i ${sample}.sorted.REF_mito.fasta --quiet -j ${thread}
 seqkit split -i ${sample}.sorted.REF_plastid.fasta --quiet -j ${thread}
-python write_blastn_commands.py ${sample} mito
-python write_blastn_commands.py ${sample} plastid
+python ../../scripts/write_blastn_commands.py ${sample} mito
+python ../../scripts/write_blastn_commands.py ${sample} plastid
 find mito_commands/ -name "*sh" > mito_commands.txt
 find plastid_commands/ -name "*sh" > plastid_commands.txt
 cat mito_commands.txt | parallel '{}' -j ${thread}
