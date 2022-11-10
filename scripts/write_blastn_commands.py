@@ -1,6 +1,6 @@
 import sys
 
-sample=sys.argv[1]
+sample = sys.argv[1]
 with open("all_" + sys.argv[2] + ".ids", "rt") as fin:
     ids = fin.readlines()
 
