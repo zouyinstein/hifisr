@@ -23,7 +23,7 @@ conda activate hifisr
 
 ```bash
 conda install pigz parallel -c conda-forge
-conda install samtools bamtools blast seqkit -c bioconda
+conda install samtools bamtools blast seqkit parafly -c bioconda
 # create a soft link to ensure samtools can work
 ln -sf ${HOME}/.conda/envs/hifisr/lib/libcrypto.so.1.1 ${HOME}/.conda/envs/hifisr/lib/libcrypto.so.1.0.0  
 ```
