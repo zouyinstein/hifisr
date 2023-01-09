@@ -99,7 +99,12 @@ if __name__ == "__main__":
     blast_records = list(NCBIXML.parse(result_handle))
     for blast_record in blast_records:
         # get info from one  record
-        blastn_info = get_blastn_info(blast_record)
+        if blast_record.alignments == []:
+            with open(sys.argv[1].rstrip(".xml") + ".error", "at") as f_error:
+                print(blast_record.query, file=f_error)            
+            continue
+        else:
+            blastn_info = get_blastn_info(blast_record)
         # merge continuous lines across borders
         count = len(blastn_info.alignments)
         blastn_info.merge_border_hits(ref_length)

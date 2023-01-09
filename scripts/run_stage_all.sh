@@ -18,24 +18,11 @@ cat split_fastq.list_all | cut -c3- | while read i; do seqkit fq2fa $i -j ${thre
 # realign mitochondrial- and plastid-genome-mapped reads
 makeblastdb -dbtype nucl -parse_seqids -in ${sample}_mito.fa
 makeblastdb -dbtype nucl -parse_seqids -in ${sample}_plastid.fa
-grep "^>" ${sample}.sorted.REF_mito.fasta | tr -d '>' > all_mito.ids
-grep "^>" ${sample}.sorted.REF_plastid.fasta | tr -d '>' > all_plastid.ids
-mkdir mito_commands plastid_commands tmp
-seqkit split -i ${sample}.sorted.REF_mito.fasta --quiet -j ${thread}
-seqkit split -i ${sample}.sorted.REF_plastid.fasta --quiet -j ${thread}
-python ../../scripts/write_blastn_commands.py ${sample} mito
-python ../../scripts/write_blastn_commands.py ${sample} plastid
-find mito_commands/ -name "*sh" > mito_commands.txt
-find plastid_commands/ -name "*sh" > plastid_commands.txt
-cat mito_commands.txt | while read i; do echo "sh " $i >> mito_commands.list; done
-cat plastid_commands.txt | while read i; do echo "sh " $i >> plastid_commands.list; done
-ParaFly -c mito_commands.list -CPU ${thread} -failed_cmds mito_commands.list.failed
-ParaFly -c plastid_commands.list -CPU ${thread} -failed_cmds plastid_commands.list.failed
-find tmp/ -name "blastn_*mito*.txt" > blastn_${sample}_mito.list
-cat blastn_${sample}_mito.list | while read i; do cat $i >> blastn_result_${sample}_mito.txt; done
-find tmp/ -name "blastn_*plastid*.txt" > blastn_${sample}_plastid.list
-cat blastn_${sample}_plastid.list | while read i; do cat $i >> blastn_result_${sample}_plastid.txt; done
-
+blastn -query ${sample}.sorted.REF_mito.fasta -db ${sample}_mito.fa -num_threads ${thread} -outfmt 5 -out blastn_${sample}_mito.xml
+blastn -query ${sample}.sorted.REF_plastid.fasta -db ${sample}_plastid.fa -num_threads ${thread} -outfmt 5 -out blastn_${sample}_plastid.xml
+python ../../scripts/analysis_blastn.py blastn_${sample}_mito.xml ${sample}_mito.fa > blastn_result_${sample}_mito.txt
+python ../../scripts/analysis_blastn.py blastn_${sample}_plastid.xml ${sample}_plastid.fa > blastn_result_${sample}_plastid.txt
+ 
 # process combined blastn results
 python ../../scripts/get_type.py blastn_result_${sample}_mito.txt > blastn_type_count_result_${sample}_mito.txt
 seq 1 ${type_number} | while read i; do grep "type_${i}" blastn_type_count_result_${sample}_mito.txt > blastn_type_${i}_result_${sample}_mito.txt; python ../../scripts/get_type_${i}.py blastn_type_${i}_result_${sample}_mito.txt > type_${i}_all_${sample}_mito.txt; done
