@@ -36,6 +36,37 @@ curl -L https://github.com/lh3/minimap2/releases/download/v2.24/minimap2-2.24_x6
 ./minimap2-2.24_x64-linux/minimap2
 ```
 
+* Install Filtlong
+
+```bash
+cd hifisr/deps
+git clone https://github.com/rrwick/Filtlong.git
+cd Filtlong
+make -j
+
+export PATH="$PWD/deps/Filtlong/bin:$PATH"
+```
+
+* Install MECAT2
+
+```bash
+cd hifisr/deps
+git clone https://github.com/xiaochuanle/MECAT2.git
+cd MECAT2
+make -j
+
+export PATH="$PWD/deps/MECAT2/Linux-amd64/bin:$PATH"
+```
+
+* Install metaFlye
+
+```bash
+cd hifisr/deps
+git clone https://github.com/fenderglass/Flye
+cd Flye
+python setup.py install
+```
+
 * Install required Python packages
 
 ```bash
@@ -50,22 +81,35 @@ pip install biopython pandas openpyxl
 # Make sure the dependent third-party softwares/packages has been installed.
 # Change working directory to hifisr
 cd hifisr
-# Add minimap2 executable to the system PATH
+# Add minimap2, filtlong, mecat.pl executables to the system PATH
 export PATH="$PWD/deps/minimap2-2.24_x64-linux":$PATH
-# Change working directory to test
-cd test
-# Copy the Arabidopsis thaliana (Col-0) reference and demo HiFi reads to a new directory Col
-cp -R start Col
-# Change working directory to the new directory Col
-cd Col
-# unzip the files
-pigz -d -p 8 *.gz
-# Run the HiFi-SR pipeline for Col
-python ../../hifisr.py -s Col single > $(date +%s).log 2> $(date +%s).err &
-# OR python ../../hifisr.py -s Col -t 16 -i fastq single > $(date +%s).log 2> $(date +%s).err &
-# clean results if you want to rerun the test
-rm -rf Col
+export PATH="$PWD/deps/Filtlong/bin:$PATH"
+export PATH="$PWD/deps/MECAT2/Linux-amd64/bin:$PATH"
+
+# Check and unzip the reference sequences
+cd references
+ls Col_mito.fa Col_plastid.fa Col_ref.fa.gz
+pigz -d -p 8 Col_ref.fa.gz
+
+# Check and unzip the input HiFi reads
+cd ../data
+pigz -d -p 8 Col.fastq.gz
+
+# Change working directory to test and prepare the file input_files.txt
+cd ../test
+touch input_files.txt
+# Contents of input_files.txt are tab-delimilated columns of sample name, input reads, total genome reference, mt genome reference, and pt  genome reference. The information of multiple samples can be added in different lines.
+
+# Prepare the starting files and directories and a job script work.sh
+python ../scripts/start_project.py input_files.txt
+# Run the job script will start the HiFi-SR pipeline
+nohup bash work.sh &
 ```
+
+**Description of results**
+
+demo
+
 
 **Example 1**
 

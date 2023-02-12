@@ -1,0 +1,1 @@
+Col-0   ../data/Col.fastq   ../references/Col_ref.fa    ../references/Col_mito.fa   ../references/Col_plastid.fa
