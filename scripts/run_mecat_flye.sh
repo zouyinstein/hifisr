@@ -25,3 +25,9 @@ cp flye_${genome}_${genome_size}K/assembly_graph.gfa flye_${genome}_${genome_siz
 
 if [ -e "mecat_${genome}.fasta" ]; then rm -rf mecat_${genome}; fi
 if [ -e "flye_${genome}_${genome_size}K_before_rr.gfa" -a -e "flye_${genome}_${genome_size}K_after_rr.gfa" ]; then rm -rf flye_${genome}_${genome_size}K; fi
+mkdir draft_assembly
+mv flye* draft_assembly
+mv mecat* draft_assembly
+mv *filt.fastq draft_assembly
+mv *config.txt draft_assembly
+
