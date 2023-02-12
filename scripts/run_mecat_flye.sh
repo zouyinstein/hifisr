@@ -9,7 +9,7 @@ if [ $genome = "mito" ]; then genome_size=370; fi
 if [ $genome = "plastid" ]; then genome_size=155; fi
 
 
-filtlong  --min_length ${length} --target_bases ${total} ${sample}.sorted.REF_${genome}.fastq > ${sample}.${genome}_filt.fastq
+filtlong  --min_length ${length} --target_bases ${total} reads/${sample}.sorted.REF_${genome}.fastq > ${sample}.${genome}_filt.fastq
 
 mecat.pl config ${genome}_config.txt
 sed s/PROJECT=/PROJECT=mecat_${genome}/ ${genome}_config.txt > new_config && mv new_config ${genome}_config.txt
@@ -25,5 +25,3 @@ cp flye_${genome}_${genome_size}K/assembly_graph.gfa flye_${genome}_${genome_siz
 
 if [ -e "mecat_${genome}.fasta" ]; then rm -rf mecat_${genome}; fi
 if [ -e "flye_${genome}_${genome_size}K_before_rr.gfa" -a -e "flye_${genome}_${genome_size}K_after_rr.gfa" ]; then rm -rf flye_${genome}_${genome_size}K; fi
-
-# if exists , rm -rf mecat_mito flye_mito_370K
