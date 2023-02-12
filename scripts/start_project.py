@@ -26,6 +26,8 @@ for i in range(len(df_samples)):
         print("bash work.sh", file=fout)
         print("cd ..", file=fout)
    
-    with open(sample + "/work.sh", "wt") as fout:
+    with open(sample + "/work.sh", "at") as fout:
         print("python ../../hifisr.py -s " + sample + " -t " + threads + " -i fastq single > $(date +%s).log 2> $(date +%s).err", file=fout)
+        print("bash ../../scripts/run_mecat_flye.sh " + sample + " mito > assembly_mito_$(date +%s).log 2> assembly_mito_$(date +%s).err" + threads, file=fout)
+        print("bash ../../scripts/run_mecat_flye.sh " + sample + " plastid > assembly_plastid_$(date +%s).log 2> assembly_plastid_$(date +%s).err" + threads, file=fout)
 
