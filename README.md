@@ -101,7 +101,7 @@ touch input_files.txt
 # Contents of input_files.txt are tab-delimilated columns of sample name, input reads, total genome reference, mt genome reference, and pt  genome reference. The information of multiple samples can be added in different lines.
 
 # Prepare the starting files and directories and a job script work.sh
-python ../scripts/start_project.py input_files.txt
+python ../scripts/start_project.py input_files.txt 8
 # Run the job script will start the HiFi-SR pipeline
 nohup bash work.sh &
 ```
@@ -109,7 +109,6 @@ nohup bash work.sh &
 **Description of results**
 
 demo
-
 
 **Example 1**
 
