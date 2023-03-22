@@ -1,6 +1,7 @@
 import pandas as pd
 from Bio import SeqIO
 import sys
+import os
 
 if not os.path.exists(sys.argv[1]):
     print("No variants. Use the old reference.")
