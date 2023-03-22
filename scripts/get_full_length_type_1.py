@@ -9,7 +9,7 @@ for line in lines:
         if (int(fields[5]) - int(fields[4]))/int(fields[1]) > 0.99:
             print(fields[0])
     else:
-        with open(sys.argv[1].split(".")[0].error, "at") as fout:
+        with open(sys.argv[1].split(".")[0] + ".error", "at") as fout:
             print(fields[0], file=fout)
 
 
