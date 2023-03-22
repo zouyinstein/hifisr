@@ -1,6 +1,16 @@
-import pandas as pd
 import sys
 
-df_type_1 = pd.read_table(sys.argv[1], header=None)
-df_type_1_fl = df_type_1[(df_type_1[5]-df_type_1[4])/df_type_1[1] > 0.99]
-print("\n".join(list(df_type_1_fl[0])))
+with open(sys.argv[1], "rt") as fin:
+    lines = [ line.rstrip("\n") for line in fin.readlines() ]
+
+for line in lines:
+    fields = line.split("\t")
+    if len(fields) == 8:
+        if (int(fields[5]) - int(fields[4]))/int(fields[1]) > 0.99:
+            print(fields[0])
+    else:
+        with open(sys.argv[1].split(".")[0].error, "at") as fout:
+            print(fields[0], file=fout)
+
+
+
