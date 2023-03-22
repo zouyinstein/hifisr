@@ -13,7 +13,8 @@ samfile = pysam.AlignmentFile(sys.argv[2], "rb") # type_1_AH-7.mito_filt_v0.sort
 ref_ID = SeqIO.read(sys.argv[3], "fasta").id # AH-7_mito_v0.fasta
 if not samfile.check_index():
     print("No bam index")
-	exit()
+    exit()
+    
 for i in range(len(df_bcftools)):
     POS = df_bcftools.loc[i, 0]
     REF = df_bcftools.loc[i, 1]
