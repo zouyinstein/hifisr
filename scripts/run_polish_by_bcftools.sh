@@ -16,7 +16,7 @@ grep "type_1" blastn_type_count_${reads/.fastq/}.txt > blastn_type_1_${reads/.fa
 python ${scripts_path}/get_type_1.py blastn_type_1_${reads/.fastq/}.txt > type_1_all_${reads/.fastq/}.txt
 ## remove type_1 reads that are not in full length
 python ${scripts_path}/get_full_length_type_1.py type_1_all_${reads/.fastq/}.txt > type_1_full_${reads/.fastq/}_ids.txt
-seqkit grep -f type_1_full_${reads/.fastq/}_ids.txt ${reference} -j ${thread} > type_1_full_${reads/.fastq/}.fasta
+seqkit grep -f type_1_full_${reads/.fastq/}_ids.txt ${reads/.fastq/}.fasta -j ${thread} > type_1_full_${reads/.fastq/}.fasta
 minimap2 -t ${thread} -ax map-hifi ${reference} type_1_full_${reads/.fastq/}.fasta > type_1_full_${reads/.fastq/}.sam
 samtools view -Sb -@ ${thread} type_1_full_${reads/.fastq/}.sam > type_1_full_${reads/.fastq/}.bam
 samtools sort type_1_full_${reads/.fastq/}.bam -@ ${thread} > type_1_full_${reads/.fastq/}.sorted.bam
