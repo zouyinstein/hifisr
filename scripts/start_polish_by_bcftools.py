@@ -31,5 +31,5 @@ for i in range(len(df_samples)):
    
     with open(sample + "/work.sh", "at") as fout:
         print("bash ../run_polish_by_bcftools.sh mito_ref.fasta mito_reads.fastq " + threads + " > mito_$(date +%s).log 2> mito_$(date +%s).err", file=fout)  
-        print("bash ../run_polish_by_bcftools.sh plastid_ref plastid_reads.fastq " + threads + " > plastid_$(date +%s).log 2> plastid_$(date +%s).err", file=fout) 
+        print("bash ../run_polish_by_bcftools.sh plastid_ref.fasta plastid_reads.fastq " + threads + " > plastid_$(date +%s).log 2> plastid_$(date +%s).err", file=fout) 
 
