@@ -28,6 +28,8 @@ conda install samtools bamtools blast seqkit parafly -c bioconda
 ln -sf ${HOME}/.conda/envs/hifisr/lib/libcrypto.so.1.1 ${HOME}/.conda/envs/hifisr/lib/libcrypto.so.1.0.0  
 ```
 
+* Install bcftools
+  demo
 * Install minimap2
 
 ```bash
