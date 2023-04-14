@@ -8,7 +8,8 @@ threads = sys.argv[2]
 
 with open("work.sh", "wt") as fout:
     print("ls start*.sh | while read i; do bash $i; done", file=fout)
-
+with open("clean.sh", "wt") as fout:
+    print("cut -f1 " + sys.argv[1] + " | while read i; do rm -rf $i start_${i}.sh work.sh clean.sh; done", file=fout)
 for i in range(len(df_samples)):
     sample = df_samples.loc[i, 0]
     reads = df_samples.loc[i, 1]
