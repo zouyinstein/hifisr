@@ -161,5 +161,5 @@ echo CEN >> merge_1.txt
 echo XJTU >> merge_1.txt
 # check conda activate hifisr
 # check export PATH=/path/to/hifisr/deps/minimap2-2.24_x64-linux:$PATH
-python ../../hifisr.py -m merge1 merge > $(date +%s).log 2> $(date +%s).err &
+python ../hifisr.py -m merge_1 merge > $(date +%s).log 2> $(date +%s).err &
 ```
