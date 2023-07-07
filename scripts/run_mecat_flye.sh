@@ -19,7 +19,7 @@ sed s/THREADS=/THREADS=${thread}/ ${genome}_config.txt > new_config && mv new_co
 mecat.pl correct ${genome}_config.txt
 cp mecat_${genome}/1-consensus/cns_final.fasta mecat_${genome}.fasta
 
-flye --meta --pacbio-hifi mecat_${genome}.fasta --extra-params output_gfa_before_rr=1 --genome-size ${genome_size}K -t 70 -o flye_${genome}_${genome_size}K
+flye --meta --pacbio-hifi mecat_${genome}.fasta --extra-params output_gfa_before_rr=1 --genome-size ${genome_size}K -t ${thread} -o flye_${genome}_${genome_size}K
 cp flye_${genome}_${genome_size}K/20-repeat/graph_before_rr.gfa ${sample}_flye_${genome}_${genome_size}K_before_rr.gfa
 cp flye_${genome}_${genome_size}K/assembly_graph.gfa ${sample}_flye_${genome}_${genome_size}K_after_rr.gfa
 
