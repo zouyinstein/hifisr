@@ -5,12 +5,18 @@ type_number=5  # analyze up to 4 rearragements in a single read
 
 # map and separate mitochondrial- and plastid-genome-mapped reads
 minimap2 -t ${thread} -ax map-hifi ${sample}_ref.fa ${sample}.${input_type} > ${sample}.sam
-samtools view -Sb -@ ${thread} ${sample}.sam > ${sample}.bam
-samtools sort ${sample}.bam -@ ${thread} > ${sample}.sorted.bam
-samtools index -@ ${thread} ${sample}.sorted.bam
-samtools flagstat ${sample}.sorted.bam -@ ${thread} > ${sample}.stat
-bamtools split -in ${sample}.sorted.bam -reference
-find ./ -name "*.REF_*.bam" > split_bam.list
+samtools view -Sb -F 4 -@ ${thread} ${sample}.sam > ${sample}.bam
+seqkit seq -n -i ${sample}_ref.fa > ref_IDs.txt
+mkdir split_bam
+/usr/software/anaconda3/bin/picard SplitSamByNumberOfReads I=${sample}.bam O=split_bam SPLIT_TO_N_FILES=${thread} OUT_PREFIX=picard
+cd split_bam
+ls -1 *.bam | cut -d '.' -f 1 > split_bam.list
+cat split_bam.list | xargs -I {} -P ${thread} samtools sort {}.bam -o {}.sorted.bam
+cat split_bam.list | xargs -I {} -P ${thread} samtools index {}.sorted.bam
+cat split_bam.list | xargs -I {} -P ${thread} bamtools split -in {}.sorted.bam -reference
+cat ../ref_IDs.txt | while read ID; do samtools merge -@ ${thread} ../${sample}.sorted.REF_${ID}.bam *.sorted.REF_${ID}.bam; done
+cd ..
+find ./ -name "${sample}*sorted*bam" > split_bam.list
 cat split_bam.list | cut -c3- | while read i; do samtools fastq $i -@ ${thread} -0 ${i/.bam/}.fastq; done
 find ./ -name "*.REF_*.fastq" > split_fastq.list_all
 cat split_fastq.list_all | cut -c3- | while read i; do seqkit fq2fa $i -j ${thread} -o ${i/.fastq/}.fasta; seqkit stat -T -a -j ${thread} $i > $i.stat; done
@@ -33,6 +39,7 @@ seq 1 ${type_number} | while read i; do grep "type_${i}" blastn_type_count_resul
 # tidy intermediate files
 pigz -p ${thread} ${sample}.${input_type}
 rm ./*sam ./*bam ./*bai ./split*
+rm -rf split_bam
 mkdir -p {mito,plastid,reads,blastn}
 mv type_*_all_${sample}_mito.txt mito
 mv type_*_all_${sample}_plastid.txt plastid
