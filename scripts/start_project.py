@@ -5,9 +5,10 @@ import os
 # input_files.txt
 df_samples = pd.read_table(sys.argv[1], header=None)    
 threads = sys.argv[2]
+parallel = sys.argv[3]
 
 with open("work.sh", "wt") as fout:
-    print("ls start*.sh | while read i; do bash $i; done", file=fout)
+    print("ls start*.sh | xargs -P " + parallel + " -I {} bash -c 'bash {} && sleep 1'", file=fout)
 with open("clean.sh", "wt") as fout:
     print("cut -f1 " + sys.argv[1] + " | while read i; do rm -rf $i start_${i}.sh work.sh clean.sh; done", file=fout)
 for i in range(len(df_samples)):
