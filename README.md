@@ -195,3 +195,8 @@ python get_variant_frequency.py /mnt/software/scripts/hifisr/deps/soft_paths.txt
 ### Example 2
 
 Recursive identification of large (> 1 kb) and intermediate-sized (50 bp - 1 kb) repeat groups in the reference.
+
+## Citation
+
+1. Zou, Y., Zhu, W., Sloan, D. B., & Wu, Z. (2022). Long-read sequencing characterizes mitochondrial and plastid genome variants in Arabidopsis msh1 mutants.  The Plant Journal,  *112* (3), 738–755. https://doi.org/10.1111/tpj.15976
+2. Yi Zou, Weidong Zhu, Yingke Hou, Daniel B. Sloan, Zhiqiang Wu. (2025). The evolutionary dynamics of organellar pan-genomes in *Arabidopsis thaliana*. bioRxiv 2025.01.20.633836; doi: https://doi.org/10.1101/2025.01.20.633836
