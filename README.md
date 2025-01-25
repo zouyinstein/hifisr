@@ -186,7 +186,7 @@ python get_mtpt_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt /mnt/s
 
 | All                                                       | mitochondria                                                        | plastid                                                           |
 | --------------------------------------------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| ![All](examples/example_1/all_length_qual_distribution.png) | ![mitochondria](examples/example_1/mito_length_qual_distribution.png) | ![plastid](examples/example_1/plastid_length_qual_distribution.png) |
+| ![All](examples/example_1/all_length_qual_distribution.jpg) | ![mitochondria](examples/example_1/mito_length_qual_distribution.jpg) | ![plastid](examples/example_1/plastid_length_qual_distribution.jpg) |
 
 #### Calling and calculating the frequencies of SVs, SNVs and small InDels with plotting
 
@@ -203,8 +203,8 @@ python get_variant_frequency.py /mnt/software/scripts/hifisr/deps/soft_paths.txt
 
 | mitochondria                                                        | plastid                                                           |
 | ------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| ![One-rearrangements](examples/example_1/mito_bubble_type_2_rep_raw.png) | ![One-rearrangements](examples/example_1/plastid_bubble_type_2_rep_raw.png) |
-| ![Coverage](examples/example_1/mito_coverage_plot.png) | ![Coverage](examples/example_1/plastid_coverage_plot.png) |
+| ![One-rearrangements](examples/example_1/mito_bubble_type_2_rep_raw.jpg) | ![One-rearrangements](examples/example_1/plastid_bubble_type_2_rep_raw.jpg) |
+| ![Coverage](examples/example_1/mito_coverage_plot.jpg) | ![Coverage](examples/example_1/plastid_coverage_plot.jpg) |
 
 ### Example 2
 
