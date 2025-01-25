@@ -152,12 +152,7 @@ make -j 20
 ### Install hifisr to the environment
 
 ```bash
-# install required packages
-pip install -i https://mirrors.aliyun.com/pypi/simple/ setuptools wheel twine
-# install using pip
 pip install hifisr==0.3.0
-# or, install it directly
-python setup.py install
 ```
 
 ## Exmaples
@@ -201,10 +196,10 @@ python get_variant_frequency.py /mnt/software/scripts/hifisr/deps/soft_paths.txt
 python get_variant_frequency.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi001 plastid run_1 /mnt/software/scripts/results/plastid_rotated_61049.fasta /mnt/software/scripts/results/ATHiFi001/reads/sample_ATHiFi001_plastid_f1k.fastq 32
 ```
 
-| mitochondria                                                        | plastid                                                           |
-| ------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| mitochondria                                                           | plastid                                                                   |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | ![One-rearrangements](examples/example_1/mito_bubble_type_2_rep_raw.jpg) | ![One-rearrangements](examples/example_1/plastid_bubble_type_2_rep_raw.jpg) |
-| ![Coverage](examples/example_1/mito_coverage_plot.jpg) | ![Coverage](examples/example_1/plastid_coverage_plot.jpg) |
+| ![Coverage](examples/example_1/mito_coverage_plot.jpg)                   | ![Coverage](examples/example_1/plastid_coverage_plot.jpg)                   |
 
 ### Example 2
 
