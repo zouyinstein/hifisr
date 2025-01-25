@@ -1,4 +1,4 @@
-import hifisr_functions as hf
+from hifisr_functions import hifisr_functions as hf
 import sys
 import os
 

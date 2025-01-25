@@ -152,7 +152,12 @@ make -j 20
 ### Install hifisr to the environment
 
 ```bash
+# install required packages
+pip install -i https://mirrors.aliyun.com/pypi/simple/ setuptools wheel twine
+# install using pip
 pip install hifisr==0.3.0
+# or, install it directly
+python setup.py install
 ```
 
 ## Exmaples
@@ -179,6 +184,10 @@ Analyze of an example wild-type *Arabidopsis thaliana* dataset Col-CEN ([ERR6210
 python get_mtpt_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt /mnt/software/scripts/results/mito_rotated_293434.fasta /mnt/software/scripts/results/plastid_rotated_61049.fasta /mnt/software/scripts/results/Col-CEN.fastq ATHiFi001 32
 ```
 
+| All                                                       | mitochondria                                                        | plastid                                                           |
+| --------------------------------------------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| ![All](examples/example_1/all_length_qual_distribution.png) | ![mitochondria](examples/example_1/mito_length_qual_distribution.png) | ![plastid](examples/example_1/plastid_length_qual_distribution.png) |
+
 #### Calling and calculating the frequencies of SVs, SNVs and small InDels with plotting
 
 ```bash
@@ -192,11 +201,11 @@ python get_variant_frequency.py /mnt/software/scripts/hifisr/deps/soft_paths.txt
 python get_variant_frequency.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi001 plastid run_1 /mnt/software/scripts/results/plastid_rotated_61049.fasta /mnt/software/scripts/results/ATHiFi001/reads/sample_ATHiFi001_plastid_f1k.fastq 32
 ```
 
+| mitochondria                                                        | plastid                                                           |
+| ------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| ![One-rearrangements](examples/example_1/mito_bubble_type_2_rep_raw.png) | ![One-rearrangements](examples/example_1/plastid_bubble_type_2_rep_raw.png) |
+| ![Coverage](examples/example_1/mito_coverage_plot.png) | ![Coverage](examples/example_1/plastid_coverage_plot.png) |
+
 ### Example 2
 
 Recursive identification of large (> 1 kb) and intermediate-sized (50 bp - 1 kb) repeat groups in the reference.
-
-## Citation
-
-1. Zou, Y., Zhu, W., Sloan, D. B., & Wu, Z. (2022). Long-read sequencing characterizes mitochondrial and plastid genome variants in Arabidopsis msh1 mutants.  The Plant Journal,  *112* (3), 738–755. https://doi.org/10.1111/tpj.15976
-2. Yi Zou, Weidong Zhu, Yingke Hou, Daniel B. Sloan, Zhiqiang Wu. (2025). The evolutionary dynamics of organellar pan-genomes in *Arabidopsis thaliana*. bioRxiv 2025.01.20.633836; doi: https://doi.org/10.1101/2025.01.20.633836

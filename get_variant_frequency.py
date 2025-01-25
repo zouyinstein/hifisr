@@ -1,4 +1,4 @@
-import hifisr_functions as hf
+from hifisr_functions import hifisr_functions as hf
 import concurrent.futures as cf
 from Bio import SeqIO
 import pandas as pd
