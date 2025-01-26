@@ -6,7 +6,7 @@ HiFi-SR is a Python-based pipeline for the detection of plant mitochondrial stru
 
 ## Installation
 
-The pipeline has been tested in WSL2 distribution Ubuntu-24.04. It shall work in other Linux operating system, such as CentOS.
+The pipeline has been tested on Ubuntu-24.04. It shall work in other Linux operating system, such as CentOS.
 
 ### Create a Python Virtual Environment and install required packages
 
