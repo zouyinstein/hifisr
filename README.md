@@ -2,7 +2,7 @@
 
 HiFi-SR is a Python-based pipeline for the detection of plant mitochondrial structural rearrangements based on the mapping of PacBio high-fidelity (HiFi) reads or Circular Consensus Sequencing (ccs) data, to a reference genome (i.e., the hypothetical master cycle DNA). HiFi-SR also includes useful scripts for organellar genome analyses.
 
-***We are currently making significant upgrades and modifications to hifisr to enhance its functionality and performance. During this period, please use the old version v.0.2.0, temporarily.***
+***We will continuously make upgrades and modifications to hifisr to enhance its functionality and performance.***
 
 ## Installation
 
