@@ -1,2 +1,9 @@
 hifisr_functions
-v0.2.0
+setup.py
+hifisr_env
+deps
+results
+dev_scripts
+hifisr.egg-info
+build
+dist

@@ -23,7 +23,7 @@ source /mnt/software/scripts/hifisr/bin/activate
 #### Install packages using your local mirror of pypi
 
 ```bash
-pip install -i https://mirrors.aliyun.com/pypi/simple/ biopython pysam pandas numpy openpyxl matplotlib
+pip install -i https://mirrors.aliyun.com/pypi/simple/ biopython pysam pandas numpy openpyxl xlsxwriter matplotlib polars
 ```
 
 ### Install other dependencies
@@ -48,7 +48,7 @@ seqkit	/mnt/software/scripts/hifisr/deps/seqkit
 mecat	/mnt/software/scripts/hifisr/deps/MECAT2/Linux-amd64/bin/mecat.pl
 blastn	/mnt/software/scripts/hifisr/deps/ncbi-blast-2.16.0+/bin/blastn
 bcftools	/mnt/software/scripts/hifisr/deps/bcftools/bcftools-1.21/bin/bcftools
-bamtools	/mnt/software/scripts/hifisr/deps/bamtools-2.5.2/bin/bamtools
+bamtools	/mnt/software/scripts/hifisr/deps/bamtools/bamtools-2.5.2/bin/bamtools
 meryl	/mnt/software/scripts/hifisr/deps/meryl-1.4.1/bin/meryl
 winnowmap	/mnt/software/scripts/hifisr/deps/Winnowmap-2.03/bin/winnowmap
 pigz	/mnt/software/scripts/hifisr/deps/pigz/pigz
@@ -117,12 +117,14 @@ rm -rf bcftools-1.21 bcftools-1.21.tar.bz2
 
 ```bash
 wget -c https://github.com/pezmaster31/bamtools/archive/refs/tags/v2.5.2.zip
-unzip -zxf v2.5.2.zip && rm v2.5.2.zip 
+unzip v2.5.2.zip && rm v2.5.2.zip 
 cd bamtools-2.5.2
 mkdir build && cd build
-cmake -DCMAKE_INSTALL_PREFIX=/mnt/software/scripts/hifisr/deps/bamtools-2.5.2 ..
+cmake -DCMAKE_INSTALL_PREFIX=/mnt/software/scripts/hifisr/deps/bamtools/bamtools-2.5.2 ..
 make -j 20
 make install
+cd ../.. && rm -rf bamtools-2.5.2
+
 ```
 
 #### Install meryl
@@ -136,8 +138,9 @@ tar -xJf meryl-1.4.1.Linux-amd64.tar.xz && rm meryl-1.4.1.Linux-amd64.tar.xz
 
 ```bash
 wget -c https://github.com/marbl/Winnowmap/archive/refs/tags/v2.03.tar.gz
-tar -zxf v2.03.tar.gz  &&cd Winnowmap-2.03/
+tar -zxf v2.03.tar.gz  && cd Winnowmap-2.03/
 make -j 20
+cd .. && rm -rf Winnowmap-2.03.tar.gz
 ```
 
 #### Install pigz
@@ -152,7 +155,7 @@ make -j 20
 ### Install hifisr to the environment
 
 ```bash
-pip install hifisr==0.3.0
+pip install hifisr==0.4.0
 ```
 
 ## Exmaples
@@ -164,10 +167,12 @@ pip install hifisr==0.3.0
 ```bash
 # create your working folder
 mkdir -p /mnt/software/scripts/results && cd /mnt/software/scripts/results
+# create a folder ref to store the references
+mkdir ref && cd ref
 # Download the references Col_mito.fa, Col_plastid.fa.
 # rotate the reference
-python rot_ref.py /mnt/software/scripts/hifisr/deps/soft_paths.txt mito Col_mito.fa
-python rot_ref.py /mnt/software/scripts/hifisr/deps/soft_paths.txt plastid Col_plastid.fa
+python adjust_ref_fasta.py /mnt/software/scripts/hifisr/deps/soft_paths.txt mito Col_mito.fa
+python adjust_ref_fasta.py /mnt/software/scripts/hifisr/deps/soft_paths.txt plastid Col_plastid.fa
 ```
 
 #### Prepare the reads (fastq format)
@@ -186,14 +191,16 @@ python get_mtpt_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt /mnt/s
 #### Calling and calculating the frequencies of SVs, SNVs and small InDels with plotting
 
 ```bash
-# generate a sample of 4000 reads for mitochondrial and plastid genome, respectively
-seqkit sample -p 0.2 /mnt/software/scripts/results/ATHiFi001/reads/ATHiFi001_mito_f1k.fastq >  /mnt/software/scripts/results/ATHiFi001/reads/sample_
-ATHiFi001_mito_f1k.fastq
-seqkit sample -p 0.01 /mnt/software/scripts/results/ATHiFi001/reads/ATHiFi001_plastid_f1k.fastq >  /mnt/software/scripts/results/ATHiFi001/reads/sample_
-ATHiFi001_plastid_f1k.fastq
+# filter the reads: remove reads shorter than 10 kb
+python filt_read_ids.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi001 mito_id_length_qual.txt plastid_id_length_qual.txt 10000 0
+
+# random sampling of 4000 reads for mitochondrial and plastid genome, respectively
+python sample_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi001 mito filt_L10K_mito_id_length_qual.txt 4000
+python sample_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi001 plastid filt_L10K_plastid_id_length_qual.txt 4000
+
 # Estimation of variant frequencies
-python get_variant_frequency.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi001 mito run_1 /mnt/software/scripts/results/mito_rotated_293434.fasta /mnt/software/scripts/results/ATHiFi001/reads/sample_ATHiFi001_mito_f1k.fastq 32
-python get_variant_frequency.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi001 plastid run_1 /mnt/software/scripts/results/plastid_rotated_61049.fasta /mnt/software/scripts/results/ATHiFi001/reads/sample_ATHiFi001_plastid_f1k.fastq 32
+python get_variants_in_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi001 mito run_1 /mnt/software/scripts/results/mito_rotated_293434.fasta /mnt/software/scripts/results/ATHiFi001/reads/sample_reads/sample_4000_mito.fastq 32
+python get_variants_in_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi001 plastid run_1 /mnt/software/scripts/results/plastid_rotated_61049.fasta /mnt/software/scripts/results/ATHiFi001/reads/sample_reads/sample_4000_plastid.fastq 32
 ```
 
 | mitochondria                                                           | plastid                                                                   |
