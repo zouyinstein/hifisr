@@ -1,4 +1,5 @@
 import sys
+sys.path.append('/mnt/software/bio/hifisr/dev') # Add the path to the hifisr_functions.py file
 import hifisr_functions.base as hfbase
 import hifisr_functions.references as hfref
 import hifisr_functions.reads as hfreads
@@ -40,7 +41,10 @@ os.chdir("reads")
 # split the reads into mito and plastid reads
 hfref.replace_fasta_id("mito", mito_absolute_path, "mito.fa")
 hfref.replace_fasta_id("plastid", plastid_absolute_path, "plastid.fa")
-command_1 = "ln -sf " + reads_absolute_path + " " + sample_index + ".fastq"
+if reads_absolute_path.endswith(".gz"):
+    command_1 = "ln -sf " + reads_absolute_path + " " + sample_index + ".fastq.gz"
+else:
+    command_1 = "ln -sf " + reads_absolute_path + " " + sample_index + ".fastq"
 ret = hfbase.get_cli_output_lines(command_1, side_effect = True)
 hfreads.split_mtpt_reads(sample_index, sample_index + ".fastq", "HiFi", "mito.fa", "plastid.fa", soft_paths_dict, threads)
 

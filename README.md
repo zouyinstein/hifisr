@@ -181,7 +181,7 @@ Analyze of an example wild-type *Arabidopsis thaliana* dataset Col-CEN ([ERR6210
 
 ```bash
 # Download the data as Col-CEN.fastq
-python get_mtpt_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt /mnt/software/scripts/results/mito_rotated_293434.fasta /mnt/software/scripts/results/plastid_rotated_61049.fasta /mnt/software/scripts/results/Col-CEN.fastq ATHiFi001 32
+python get_mtpt_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi001 /mnt/software/scripts/results/mito_rotated_293434.fasta /mnt/software/scripts/results/plastid_rotated_61049.fasta /mnt/software/scripts/results/Col-CEN.fastq 32
 ```
 
 | All                                                       | mitochondria                                                        | plastid                                                           |
