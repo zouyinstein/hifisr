@@ -172,7 +172,7 @@ unzip Bandage_Ubuntu_static_v0_8_1.zip && rm Bandage_Ubuntu_static_v0_8_1.zip sa
 ### Install hifisr to the environment
 
 ```bash
-pip install hifisr==0.4.0
+pip install hifisr==0.4.1
 ```
 
 ## Exmaples
