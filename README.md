@@ -38,6 +38,7 @@ touch soft_paths.txt
 #### Add the paths of all required software in soft_paths.txt
 
 ```bash
+
 # Contents of soft_paths.txt: A TAB-delimited File containing software names, and the path to the executable.
 # If your have the softwares installed, add them directly to the file.
 # Otherwise, you can install new versions of them.
@@ -52,6 +53,7 @@ bamtools	/mnt/software/scripts/hifisr/deps/bamtools/bamtools-2.5.2/bin/bamtools
 meryl	/mnt/software/scripts/hifisr/deps/meryl-1.4.1/bin/meryl
 winnowmap	/mnt/software/scripts/hifisr/deps/Winnowmap-2.03/bin/winnowmap
 pigz	/mnt/software/scripts/hifisr/deps/pigz/pigz
+bandage	/mnt/software/scripts/hifisr/deps/Bandage
 ```
 
 #### Install minimap2
@@ -150,6 +152,21 @@ wget -c https://zlib.net/pigz/pigz.tar.gz
 tar -zxf pigz.tar.gz && rm pigz.tar.gz
 cd pigz
 make -j 20
+```
+
+#### Install Flye
+
+```bash
+git clone https://github.com/fenderglass/Flye
+cd Flye
+python setup.py install
+```
+
+#### Install Bandage
+
+```bash
+wget -c https://github.com/rrwick/Bandage/releases/download/v0.8.1/Bandage_Ubuntu_static_v0_8_1.zip
+unzip Bandage_Ubuntu_static_v0_8_1.zip && rm Bandage_Ubuntu_static_v0_8_1.zip sample_LastGraph
 ```
 
 ### Install hifisr to the environment

@@ -1,4 +1,5 @@
 import sys
+sys.path.append('/mnt/software/bio/hifisr/dev') # Add the path to the hifisr_functions.py file
 import hifisr_functions.base as hfbase
 import hifisr_functions.references as hfref
 import hifisr_functions.reads as hfreads
@@ -66,5 +67,6 @@ df = hfvar.snv_or_indel("all_bcftools_calls.txt", "snv_indel_reformat_single.xls
 # annotate the variants: types, effects, sequence features
 df_anno_raw = hfanno.get_variant_types(genome_absolute_path, "snv_indel_reformat_single.xlsx", "variants_anno_single.xlsx")
 hfanno.combine_variant_anno("variants_anno_single.xlsx", "variants_anno_combined.xlsx")
+hfanno.add_depth_and_frq("variants_anno_combined.xlsx", "variant_cov.txt", "variants_anno_combined_depth_frq.xlsx", "variants_anno_combined_depth_frq_filter.xlsx", engine="calamine")
 
 os.chdir("../../..")
