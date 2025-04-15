@@ -180,7 +180,7 @@ cd hifiasm && make -j 8
 ### Install hifisr to the environment
 
 ```bash
-pip install hifisr==0.4.1
+pip install hifisr==0.5.0
 ```
 
 ## Exmaples
