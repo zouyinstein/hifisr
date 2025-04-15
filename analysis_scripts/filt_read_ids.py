@@ -1,5 +1,4 @@
 import sys
-sys.path.append('/mnt/software/bio/hifisr/dev') # Add the path to the hifisr_functions.py file
 import hifisr_functions.base as hfbase
 import hifisr_functions.reads as hfreads
 import hifisr_functions.reports as hfrps
