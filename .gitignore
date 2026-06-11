@@ -1,5 +1,6 @@
 hifisr_env
-deps
+deps/*
+!deps/soft_paths_conda.txt
 results
 results_*/
 .snakemake

@@ -1,0 +1,19 @@
+# hifisr soft_paths example for a Conda/Mamba environment on Linux.
+# Copy this file to deps/soft_paths.txt or pass it with:
+#   --config soft_paths=deps/soft_paths_conda.txt
+# Replace /path/to/miniconda3/envs/hifisr and the MECAT2 path with real paths.
+# environment.yml installs the other listed command-line tools into the Conda env.
+# Format: software_name<TAB>absolute_path_to_executable
+python	/path/to/miniconda3/envs/hifisr/bin/python
+minimap2	/path/to/miniconda3/envs/hifisr/bin/minimap2
+samtools	/path/to/miniconda3/envs/hifisr/bin/samtools
+seqkit	/path/to/miniconda3/envs/hifisr/bin/seqkit
+mecat	/path/to/MECAT2/Linux-amd64/bin/mecat.pl
+blastn	/path/to/miniconda3/envs/hifisr/bin/blastn
+bcftools	/path/to/miniconda3/envs/hifisr/bin/bcftools
+bamtools	/path/to/miniconda3/envs/hifisr/bin/bamtools
+pigz	/path/to/miniconda3/envs/hifisr/bin/pigz
+bandage	/path/to/miniconda3/envs/hifisr/bin/Bandage
+hifiasm	/path/to/miniconda3/envs/hifisr/bin/hifiasm
+flye	/path/to/miniconda3/envs/hifisr/bin/flye
+canu	/path/to/miniconda3/envs/hifisr/bin/canu

@@ -1,251 +1,112 @@
 # hifisr
 
+HiFi-SR is a Python-based workflow for organellar genome read extraction,
+draft assembly, polishing, alignment, and structural-variant review from HiFi
+reads.
+
 ***We will continuously make upgrades and modifications to hifisr to enhance its functionality and performance.***
 
 ## Installation
 
-The pipeline has been tested on Ubuntu-24.04. It shall work in other Linux operating system, such as CentOS.
+Detailed environment setup, PyPI mirror installation, and third-party software
+installation commands are maintained in [docs/installation.md](docs/installation.md).
+The Snakemake workflow runs directly from this source checkout; installing the
+`hifisr` package itself is not required.
 
-### Create a Python Virtual Environment and install required packages
+Function usage notes and pure/impure markers for `hifisr_functions/` are in
+[docs/hifisr_functions_reference.md](docs/hifisr_functions_reference.md).
 
-#### Create and activate a venv environment
+## Dependency Coverage
 
-```bash
-# /mnt/software/sys/python/python-3.13.1/bin is your path to the python executable
-# /mnt/software/scripts/hifisr in the virtual environment directory
-mkdir /mnt/software/scripts/hifisr
-/mnt/software/sys/python/python-3.13.1/bin/python3.13 -m venv /mnt/software/scripts/hifisr
-source /mnt/software/scripts/hifisr/bin/activate
-```
+The current Snakemake workflow has two dependency layers:
 
-#### Install packages using your local mirror of pypi
+- Python packages: `requirements-dev.txt` and `environment.yml` cover the Python
+  environment, including Snakemake and the analysis libraries.
+- External command-line tools: `soft_paths.txt` points the workflow to the
+  server-specific executable paths.
 
-```bash
-pip install -i https://mirrors.aliyun.com/pypi/simple/ biopython pysam pandas numpy openpyxl xlsxwriter matplotlib polars fastexcel
-```
+The Conda environment is pinned to Python 3.11; other Python versions may also
+work, but they have not been tested for this workflow.
 
-### Install other dependencies
+The workflow-facing external tools are `python`, `minimap2`, `samtools`,
+`seqkit`, `mecat`, `blastn`, `bcftools`, `bamtools`, `pigz`, `bandage`,
+`hifiasm`, `flye`, and `canu`. The macOS example may also include legacy
+entries such as `meryl` and `winnowmap`; these are not required by the current
+W3-5-2 Snakemake workflow.
 
-#### Create a folder to install third-party softwares
+## soft_paths Configuration
 
-```bash
-mkdir deps && cd deps
-touch soft_paths.txt
-```
-
-#### Add the paths of all required software in soft_paths.txt
-
-```bash
-
-# Contents of soft_paths.txt: A TAB-delimited File containing software names, and the path to the executable.
-# If your have the softwares installed, add them directly to the file.
-# Otherwise, you can install new versions of them.
-python	/mnt/software/scripts/hifisr/bin/python
-minimap2	/mnt/software/scripts/hifisr/deps/minimap2-2.28_x64-linux/minimap2
-samtools	/mnt/software/scripts/hifisr/deps/samtools/samtools-1.21/bin/samtools
-seqkit	/mnt/software/scripts/hifisr/deps/seqkit
-mecat	/mnt/software/scripts/hifisr/deps/MECAT2/Linux-amd64/bin/mecat.pl
-blastn	/mnt/software/scripts/hifisr/deps/ncbi-blast-2.16.0+/bin/blastn
-bcftools	/mnt/software/scripts/hifisr/deps/bcftools/bcftools-1.21/bin/bcftools
-bamtools	/mnt/software/scripts/hifisr/deps/bamtools/bamtools-2.5.2/bin/bamtools
-meryl	/mnt/software/scripts/hifisr/deps/meryl-1.4.1/bin/meryl
-winnowmap	/mnt/software/scripts/hifisr/deps/Winnowmap-2.03/bin/winnowmap
-pigz	/mnt/software/scripts/hifisr/deps/pigz/pigz
-bandage	/mnt/software/scripts/hifisr/deps/Bandage
-hifiasm	/mnt/software/scripts/hifisr/deps/hifiasm/hifiasm
-flye	/mnt/software/scripts/hifisr/deps/Flye/bin/flye
-canu	/mnt/software/scripts/hifisr/deps/canu-2.3/bin/canu
-```
-
-#### Install minimap2
-
-```bash
-cd /mnt/software/scripts/hifisr/deps
-curl -L https://github.com/lh3/minimap2/releases/download/v2.28/minimap2-2.28_x64-linux.tar.bz2 | tar -jxvf -
-```
-
-#### Install samtools
-
-```bash
-wget -c https://github.com/samtools/samtools/releases/download/1.21/samtools-1.21.tar.bz2
-tar -xjf samtools-1.21.tar.bz2
-cd samtools-1.21
-autoheader
-autoconf -Wno-syntax
-./configure --prefix=/mnt/software/scripts/hifisr/deps/samtools/samtools-1.21
-make -j 20
-make install
-cd ..
-rm -rf samtools-1.21 samtools-1.21.tar.bz2
-```
-
-#### Install seqkit
-
-```
-# choose the correct executable for your platform
-wget -c http://app.shenwei.me/data/seqkit/seqkit_linux_amd64.tar.gz
-tar -zxf seqkit_linux_amd64.tar.gz
-rm seqkit_linux_amd64.tar.gz
-```
-
-#### Install mecat
-
-```bash
-git clone https://github.com/xiaochuanle/MECAT2.git
-cd MECAT2
-make -j 20
-```
-
-#### install blastn
-
-```bash
-wget -c https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.16.0+-x64-linux.tar.gz
-tar -zxf ncbi-blast-2.16.0+-x64-linux.tar.gz && rm ncbi-blast-2.16.0+-x64-linux.tar.gz
-```
-
-#### Install bcftools
-
-```bash
-wget -c https://github.com/samtools/bcftools/releases/download/1.21/bcftools-1.21.tar.bz2
-tar -xjf bcftools-1.21.tar.bz2
-cd bcftools-1.21
-./configure --prefix=/mnt/software/scripts/hifisr/deps/bcftools/bcftools-1.21
-make -j 20
-make install
-cd ..
-rm -rf bcftools-1.21 bcftools-1.21.tar.bz2
-```
-
-#### Install bamtools
-
-```bash
-wget -c https://github.com/pezmaster31/bamtools/archive/refs/tags/v2.5.2.zip
-unzip v2.5.2.zip && rm v2.5.2.zip 
-cd bamtools-2.5.2
-mkdir build && cd build
-cmake -DCMAKE_INSTALL_PREFIX=/mnt/software/scripts/hifisr/deps/bamtools/bamtools-2.5.2 ..
-make -j 20
-make install
-cd ../.. && rm -rf bamtools-2.5.2
-
-```
-
-#### Install meryl
-
-```bash
-wget -c https://github.com/marbl/meryl/releases/download/v1.4.1/meryl-1.4.1.Linux-amd64.tar.xz
-tar -xJf meryl-1.4.1.Linux-amd64.tar.xz && rm meryl-1.4.1.Linux-amd64.tar.xz
-```
-
-#### Install winnowmap
-
-```bash
-wget -c https://github.com/marbl/Winnowmap/archive/refs/tags/v2.03.tar.gz
-tar -zxf v2.03.tar.gz  && cd Winnowmap-2.03/
-make -j 20
-cd .. && rm -rf Winnowmap-2.03.tar.gz
-```
-
-#### Install pigz
-
-```bash
-wget -c https://zlib.net/pigz/pigz.tar.gz
-tar -zxf pigz.tar.gz && rm pigz.tar.gz
-cd pigz
-make -j 20
-```
-
-#### Install Flye
-
-```bash
-git clone https://github.com/fenderglass/Flye
-cd Flye
-python setup.py install
-```
-
-#### Install Bandage
-
-```bash
-wget -c https://github.com/rrwick/Bandage/releases/download/v0.8.1/Bandage_Ubuntu_static_v0_8_1.zip
-unzip Bandage_Ubuntu_static_v0_8_1.zip && rm Bandage_Ubuntu_static_v0_8_1.zip sample_LastGraph
-```
-
-#### Install hifiasm
-
-```bash
-git clone https://github.com/chhylp123/hifiasm
-cd hifiasm && make -j 8
-```
-
-### Use the source checkout directly
-
-The local test workflow runs directly from this source tree and does not
-require installing the `hifisr` package into the virtual environment. Shared Python code is maintained in
-`hifisr_functions/`, and the entry-point scripts under `analysis_scripts/` load
-that local source directory through `analysis_scripts/_bootstrap.py`.
-
-Keep this directory layout intact when copying the workflow to a server:
+The default server path file is:
 
 ```text
-hifisr/
-  analysis_scripts/
-    _bootstrap.py
-  hifisr_functions/
-  workflow/
-  Snakefile
+deps/soft_paths.txt
 ```
 
-### Install Snakemake for the local test workflow
+The file must be tab-delimited: first column is the software name, second column
+is the absolute path to the executable. For Linux server runs, create this file
+locally on the server and keep it out of Git.
 
-On Ubuntu, install the system packages needed to create virtual environments
-and provide Python's `sqlite3` module, which Snakemake requires:
-
-```bash
-sudo apt update
-sudo apt install -y python3-venv sqlite3 libsqlite3-dev
+```text
+python	/path/to/hifisr/.venv/bin/python
+minimap2	/path/to/minimap2
+samtools	/path/to/samtools
+seqkit	/path/to/seqkit
+mecat	/path/to/mecat.pl
+blastn	/path/to/blastn
+bcftools	/path/to/bcftools
+bamtools	/path/to/bamtools
+pigz	/path/to/pigz
+bandage	/path/to/Bandage
+hifiasm	/path/to/hifiasm
+flye	/path/to/flye
+canu	/path/to/canu
 ```
 
-Create and activate a virtual environment from the `hifisr` project root:
+For Conda/Mamba environments, use [deps/soft_paths_conda.txt](deps/soft_paths_conda.txt)
+as a template. The `python` entry should match `which python` after activating
+the Conda environment:
 
-```bash
-cd /path/to/hifisr
-python3 -m venv .venv
-source .venv/bin/activate
-python -c "import sqlite3; print(sqlite3.sqlite_version)"
-python -m pip install --upgrade pip
-python -m pip install -r requirements-dev.txt
+```text
+python	/path/to/miniconda3/envs/hifisr/bin/python
 ```
 
-The `source .venv/bin/activate` command makes `python`, `pip`, and
-`python -m snakemake` use this environment in the current shell session. Confirm
-the active environment and Snakemake installation with:
+`environment.yml` installs the Conda-available third-party tools into the Conda
+environment: `minimap2`, `samtools`, `seqkit`, `blast`/`blastn`, `bcftools`,
+`bamtools`, `pigz`, `bandage`, `hifiasm`, `flye`, and `canu`. `mecat` still
+needs a manual path in `soft_paths.txt`.
 
-```bash
-which python
-python -m snakemake --version
+The repository also includes a macOS local-development example:
+
+```text
+deps/soft_paths_macOS.txt
 ```
 
-If `python -c "import sqlite3"` fails with `No module named '_sqlite3'`, rebuild
-the virtual environment with a Python executable that has sqlite support, for
-example the system Python that passes the same import check.
-
-On Python 3.10, `pip` may install an older Snakemake release. That release
-expects the older PuLP `list_solvers` API, so `requirements-dev.txt` pins
-`pulp==2.7.0`. If Snakemake fails with
-`AttributeError: module 'pulp' has no attribute 'list_solvers'`, reinstall the
-dependencies in the active environment:
+Do not use the macOS file on Ubuntu unless every path has been replaced with
+server executables. To use a non-default file, pass it explicitly:
 
 ```bash
-python -m pip install --force-reinstall "pulp==2.7.0"
-python -m pip install -r requirements-dev.txt
-python -m snakemake --version
+python -m snakemake --configfile workflow/config/w3_5_2_linux.yaml \
+  --config soft_paths=deps/soft_paths.txt \
+  --cores 8 final
 ```
 
-If you are not using `requirements-dev.txt`, install Snakemake in the same
-Python environment that will be listed as `python` in `deps/soft_paths.txt`:
+## quick_check
+
+Before running a workflow on a server, check both the `soft_paths` executables
+and the Python packages installed in the workflow Python environment.
+
+Third-party tools checked from `soft_paths`: `python`, `minimap2`, `samtools`,
+`seqkit`, `mecat`, `blastn`, `bcftools`, `bamtools`, `pigz`, `bandage`,
+`hifiasm`, `flye`, and `canu`.
+
+Python packages checked from `requirements-dev.txt`: `biopython`, `pysam`,
+`pandas`, `numpy`, `openpyxl`, `xlsxwriter`, `matplotlib`, `polars`,
+`fastexcel`, `pulp==2.7.0`, `snakemake`, and `pytest`.
 
 ```bash
-python -m pip install snakemake
+python -m snakemake --configfile workflow/config/w3_5_2_linux.yaml \
+  --config soft_paths=deps/soft_paths.txt \
+  --cores 1 check_runtime_dependencies
 ```
 
 ## Local Snakemake Test Workflow

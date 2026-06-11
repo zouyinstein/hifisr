@@ -1,6 +1,7 @@
 configfile: "workflow/config/w3_5_2_macOS.yaml"
 
 from pathlib import Path
+import sys
 
 shell.executable("/bin/bash")
 
@@ -60,6 +61,8 @@ FORMAT_VARS = {
 
 SCRIPT_DIR = PROJECT_ROOT / "analysis_scripts"
 SOFT_PATHS = _path(config.get("soft_paths", "{project_root}/deps/soft_paths.txt"))
+REQUIREMENTS = str(PROJECT_ROOT / "requirements-dev.txt")
+SNAKEMAKE_PYTHON = sys.executable
 
 
 def load_soft_paths(path):
@@ -270,6 +273,22 @@ FINAL_TARGETS = [
 rule all:
     input:
         FINAL_TARGETS
+
+
+rule check_runtime_dependencies:
+    input:
+        soft_paths=SOFT_PATHS,
+        requirements=REQUIREMENTS,
+        script=str(SCRIPT_DIR / "check_runtime_dependencies.py")
+    log:
+        str(LOG_DIR / "check_runtime_dependencies.log")
+    shell:
+        r"""
+        {RUNTIME_DIRS}
+        "{SNAKEMAKE_PYTHON}" "{input.script}" "{input.soft_paths}" \
+          --requirements "{input.requirements}" > "{log}" 2>&1
+        cat "{log}"
+        """
 
 
 rule references_ready:

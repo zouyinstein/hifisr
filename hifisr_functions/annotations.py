@@ -1,3 +1,12 @@
+# HiFiSR module guide:
+# - base: command, file, and soft_paths helpers; import hifisr_functions.base as hfbase
+# - reads: read extraction, filtering, sampling, and correction; import hifisr_functions.reads as hfreads
+# - references: reference rotation, assembly, polishing, and alignment; import hifisr_functions.references as hfref
+# - variants: read-variant calling, grouping, and frequency analysis; import hifisr_functions.variants as hfvar
+# - transfer: organelle/nuclear transfer-fragment analysis; import hifisr_functions.transfer as hftrans
+# - annotations: annotation tables and feature-level summaries; import hifisr_functions.annotations as hfanno
+# - reports: read statistics, plots, Excel tables, and report outputs; import hifisr_functions.reports as hfrps
+
 import hifisr_functions.base as hfbase
 import hifisr_functions.variants as hfvar
 import hifisr_functions.references as hfref
@@ -10,6 +19,19 @@ from Bio import SeqIO
 import math
 import os
 import sys
+
+# Function purity marker. "pure" means deterministic from explicit inputs with
+# no file, shell, environment, logging, or input-mutation side effects.
+FUNCTION_PURITY = {
+    "get_variant_types": "impure",
+    "combine_variant_anno": "impure",
+    "add_depth_and_frq": "impure",
+    "run_transfer_blastn": "impure",
+    "merge_fragments_files": "impure",
+    "remove_inner_fragments": "impure",
+    "merge_numt_nupt": "impure",
+    "get_raw_transfer_groups": "impure",
+}
 
 
 def get_variant_types(ref_fasta_file, input_excel, output_excel):
@@ -722,4 +744,3 @@ def get_raw_transfer_groups(num_Chr):
                 df_blastn_alignments.loc[j, "group_type"] = "same"
         df_blastn_alignments = df_blastn_alignments[["index", "group_index", "group_type", "group_start", "group_end", "group_size", "group_size_flag", "max_fragment_size", "chimeric", "N_percentage", "chr_name", "contig_name", "aln_len", "aln_olp_len", "aln_idt", "aln_strand", "aln_qs", "aln_qe", "aln_ss", "aln_se", "has_inner_fragment", "keep_or_remove", "inner_fragments"]]
         df_blastn_alignments.to_excel("grouped_" + chr_name + "_blastn_alignments.xlsx", index=False)
-

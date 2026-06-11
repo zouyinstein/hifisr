@@ -1,0 +1,21 @@
+name: hifisr
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.11
+  - pip
+  - sqlite
+  - minimap2
+  - samtools
+  - seqkit
+  - blast
+  - bcftools
+  - bamtools
+  - pigz
+  - bandage
+  - hifiasm
+  - flye
+  - canu
+  - pip:
+      - -r requirements-dev.txt

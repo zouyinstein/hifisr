@@ -1,3 +1,12 @@
+# HiFiSR module guide:
+# - base: command, file, and soft_paths helpers; import hifisr_functions.base as hfbase
+# - reads: read extraction, filtering, sampling, and correction; import hifisr_functions.reads as hfreads
+# - references: reference rotation, assembly, polishing, and alignment; import hifisr_functions.references as hfref
+# - variants: read-variant calling, grouping, and frequency analysis; import hifisr_functions.variants as hfvar
+# - transfer: organelle/nuclear transfer-fragment analysis; import hifisr_functions.transfer as hftrans
+# - annotations: annotation tables and feature-level summaries; import hifisr_functions.annotations as hfanno
+# - reports: read statistics, plots, Excel tables, and report outputs; import hifisr_functions.reports as hfrps
+
 import hifisr_functions.base as hfbase
 import numpy as np
 import pandas as pd
@@ -14,6 +23,17 @@ import matplotlib.gridspec as gridspec
 import matplotlib.colors as mcolors
 from collections import OrderedDict
 import sys
+
+# Function purity marker. "pure" means deterministic from explicit inputs with
+# no file, shell, environment, logging, or input-mutation side effects.
+FUNCTION_PURITY = {
+    "get_fastq_stats": "impure",
+    "plot_length_qual": "impure",
+    "plot_bubble_type_2_rep_raw": "impure",
+    "plot_coverage": "impure",
+    "get_gfa_blastn_png": "impure",
+    "convert_blastn_alignments_to_table": "impure",
+}
 
 
 def get_fastq_stats(prefix, sample_fastq_path, soft_paths_dict, threads):

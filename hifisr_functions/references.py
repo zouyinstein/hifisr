@@ -1,3 +1,12 @@
+# HiFiSR module guide:
+# - base: command, file, and soft_paths helpers; import hifisr_functions.base as hfbase
+# - reads: read extraction, filtering, sampling, and correction; import hifisr_functions.reads as hfreads
+# - references: reference rotation, assembly, polishing, and alignment; import hifisr_functions.references as hfref
+# - variants: read-variant calling, grouping, and frequency analysis; import hifisr_functions.variants as hfvar
+# - transfer: organelle/nuclear transfer-fragment analysis; import hifisr_functions.transfer as hftrans
+# - annotations: annotation tables and feature-level summaries; import hifisr_functions.annotations as hfanno
+# - reports: read statistics, plots, Excel tables, and report outputs; import hifisr_functions.reports as hfrps
+
 from Bio import SeqIO
 import hifisr_functions.base as hfbase
 import hifisr_functions.variants as hfvar
@@ -5,6 +14,22 @@ import numpy as np
 from collections import OrderedDict
 import sys
 import os
+
+# Function purity marker. "pure" means deterministic from explicit inputs with
+# no file, shell, environment, logging, or input-mutation side effects.
+FUNCTION_PURITY = {
+    "replace_fasta_id": "impure",
+    "get_subseq": "pure",
+    "get_rc": "impure",
+    "rotate_ref_to_non_repeat_region": "impure",
+    "find_continous_zeros": "impure",
+    "rotate_fasta": "impure",
+    "mecat_cns": "impure",
+    "flye_assemble": "impure",
+    "flye_polish": "impure",
+    "aln_to_ref": "impure",
+    "get_flipped_fasta": "impure",
+}
 
 
 def replace_fasta_id(genome, input_fasta_path, output_fasta_path):

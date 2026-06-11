@@ -1,9 +1,31 @@
+# HiFiSR module guide:
+# - base: command, file, and soft_paths helpers; import hifisr_functions.base as hfbase
+# - reads: read extraction, filtering, sampling, and correction; import hifisr_functions.reads as hfreads
+# - references: reference rotation, assembly, polishing, and alignment; import hifisr_functions.references as hfref
+# - variants: read-variant calling, grouping, and frequency analysis; import hifisr_functions.variants as hfvar
+# - transfer: organelle/nuclear transfer-fragment analysis; import hifisr_functions.transfer as hftrans
+# - annotations: annotation tables and feature-level summaries; import hifisr_functions.annotations as hfanno
+# - reports: read statistics, plots, Excel tables, and report outputs; import hifisr_functions.reports as hfrps
+
 import hifisr_functions.base as hfbase
 from Bio import SeqIO
 import polars as pl
 import sys
 import os
 import pysam
+
+# Function purity marker. "pure" means deterministic from explicit inputs with
+# no file, shell, environment, logging, or input-mutation side effects.
+FUNCTION_PURITY = {
+    "split_mtpt_reads": "impure",
+    "split_reads_by_contig": "impure",
+    "filt_length_qual": "impure",
+    "random_sampling": "impure",
+    "replace_reads_id": "impure",
+    "cal_ID_coverage": "impure",
+    "calc_error_rate": "impure",
+    "correct_reads_by_canu": "impure",
+}
 
 
 def split_mtpt_reads(sample_index, sample_fastq_path, sample_platform, mito_fa, plastid_fa, soft_paths_dict, threads):

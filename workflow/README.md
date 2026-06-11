@@ -40,50 +40,8 @@ If the file is stored elsewhere, override the config:
 python -m snakemake --cores 8 --config soft_paths=/path/to/soft_paths.txt final
 ```
 
-On Ubuntu, install the system packages needed to create virtual environments
-and provide Python's `sqlite3` module, which Snakemake requires:
-
-```bash
-sudo apt update
-sudo apt install -y python3-venv sqlite3 libsqlite3-dev
-```
-
-Create and activate the Python environment from the `hifisr` project root
-before running Snakemake:
-
-```bash
-cd /path/to/hifisr
-python3 -m venv .venv
-source .venv/bin/activate
-python -c "import sqlite3; print(sqlite3.sqlite_version)"
-python -m pip install --upgrade pip
-python -m pip install -r requirements-dev.txt
-```
-
-The `source .venv/bin/activate` command makes `python`, `pip`, and
-`python -m snakemake` use this environment in the current shell session. Confirm
-the active environment and Snakemake installation with:
-
-```bash
-which python
-python -m snakemake --version
-```
-
-If `python -c "import sqlite3"` fails with `No module named '_sqlite3'`, rebuild
-the virtual environment with a Python executable that has sqlite support, for
-example the system Python that passes the same import check.
-
-On Python 3.10, `pip` may install an older Snakemake release. That release
-expects the older PuLP `list_solvers` API, so `requirements-dev.txt` pins
-`pulp==2.7.0`. If Snakemake fails with
-`AttributeError: module 'pulp' has no attribute 'list_solvers'`, reinstall the
-dependencies in the active environment:
-
-```bash
-python -m pip install --force-reinstall "pulp==2.7.0"
-python -m pip install -r requirements-dev.txt
-python -m snakemake --version
-```
+Environment creation, PyPI mirror installation, and third-party software
+installation commands are documented in [../docs/installation.md](../docs/installation.md).
 
 The default software path file location is:
 
@@ -102,6 +60,10 @@ or pass it explicitly:
 ```bash
 python -m snakemake --config soft_paths=deps/soft_paths_macOS.txt --cores 8 final
 ```
+
+For Conda/Mamba environments, use `deps/soft_paths_conda.txt` as a template.
+The `python` entry should match `which python` after activating the Conda
+environment.
 
 Example contents:
 
@@ -186,6 +148,12 @@ Run with both files specified:
 python -m snakemake \
   --configfile workflow/config/w3_5_2_linux.yaml \
   --config soft_paths=deps/soft_paths.txt \
+  --cores 1 \
+  check_runtime_dependencies
+
+python -m snakemake \
+  --configfile workflow/config/w3_5_2_linux.yaml \
+  --config soft_paths=deps/soft_paths.txt \
   --cores 8 \
   references_ready
 ```
@@ -212,7 +180,7 @@ Run from the `hifisr` project root:
 
 ```bash
 cd /path/to/hifisr
-python -m pip install snakemake
+python -m snakemake --cores 1 check_runtime_dependencies
 python -m snakemake --cores 8 references_ready
 python -m snakemake --cores 8 reads_ready
 python -m snakemake --cores 8 draft_for_manual_edit
@@ -255,6 +223,8 @@ python -m snakemake -n --cores 8 final
 Snakemake resumes from file endpoints. For example:
 
 - `references_ready` checks that workflow references are available.
+- `check_runtime_dependencies` checks every executable listed in `soft_paths`
+  and verifies the Python packages in `requirements-dev.txt`.
 - `reads_ready` stops after mito/plastid read extraction, filtering, and sampling.
 - `draft_for_manual_edit` stops after draft GFA and PNG files are ready.
 - `polish_alignment_variant` runs polish/alignment plus read-variant analysis for mito and plastid.

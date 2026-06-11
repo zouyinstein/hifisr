@@ -1,3 +1,12 @@
+# HiFiSR module guide:
+# - base: command, file, and soft_paths helpers; import hifisr_functions.base as hfbase
+# - reads: read extraction, filtering, sampling, and correction; import hifisr_functions.reads as hfreads
+# - references: reference rotation, assembly, polishing, and alignment; import hifisr_functions.references as hfref
+# - variants: read-variant calling, grouping, and frequency analysis; import hifisr_functions.variants as hfvar
+# - transfer: organelle/nuclear transfer-fragment analysis; import hifisr_functions.transfer as hftrans
+# - annotations: annotation tables and feature-level summaries; import hifisr_functions.annotations as hfanno
+# - reports: read statistics, plots, Excel tables, and report outputs; import hifisr_functions.reports as hfrps
+
 import hifisr_functions.base as hfbase
 import hifisr_functions.reads as hfreads
 from Bio import SeqIO
@@ -9,6 +18,28 @@ import math
 import sys
 import os
 import tempfile
+
+# Function purity marker. "pure" means deterministic from explicit inputs with
+# no file, shell, environment, logging, or input-mutation side effects.
+FUNCTION_PURITY = {
+    "get_tmp_root": "impure",
+    "Index_label_alignments": "impure",
+    "run_blastn_sorter_single": "impure",
+    "run_multi_threads_blastn": "impure",
+    "get_type_and_subtype": "impure",
+    "check_FL_and_multi": "impure",
+    "get_next_groups": "pure",
+    "match_se1_ss2": "impure",
+    "match_se1_ss2_se2_ss3": "impure",
+    "match_se1_ss2_se2_ss3_se3_ss4": "impure",
+    "match_se1_ss2_se2_ss3_se3_ss4_se4_ss5": "impure",
+    "get_subgroups": "impure",
+    "summarize_blastn_results": "impure",
+    "get_cov_reads": "impure",
+    "run_bcftools": "impure",
+    "run_multi_threads_bcftools": "impure",
+    "snv_or_indel": "impure",
+}
 
 
 def get_tmp_root():
