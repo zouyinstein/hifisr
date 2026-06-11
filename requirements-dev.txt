@@ -5,6 +5,7 @@ numpy
 openpyxl
 pandas
 polars
+pulp==2.7.0
 pysam
 snakemake
 xlsxwriter

@@ -115,13 +115,13 @@ def main() -> int:
     )
     parser.add_argument(
         "--soft-paths",
-        default="deps/soft_paths.txt",
+        default="deps/soft_paths_macOS.txt",
         help="Path written with local third-party executable locations.",
     )
     parser.add_argument(
         "--skip-soft-paths",
         action="store_true",
-        help="Do not write deps/soft_paths.txt.",
+        help="Do not write the local soft_paths file.",
     )
     args = parser.parse_args()
 

@@ -141,7 +141,7 @@ def plot_coverage(cov_file_1, cov_file_2, cov_file_3, start, end, fig_length=12,
 
 def get_gfa_blastn_png(genome_absolute_path, soft_paths_dict):
     command_3 = "ls -1 *.gfa | while read i; do " + soft_paths_dict.get("bandage") + " image $i ${i%.gfa}.png --edgelen 25 --singlearr --depwidth 0.8 --colour blastsolid --query " + genome_absolute_path + "; done"
-    ret = hfbase.get_cli_output_lines(command_3, side_effect = True)
+    hfbase.run_checked(command_3)
     return
 
 

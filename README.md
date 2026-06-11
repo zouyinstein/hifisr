@@ -1,7 +1,5 @@
 # hifisr
 
-HiFi-SR is a Python-based pipeline for the detection of plant mitochondrial structural rearrangements based on the mapping of PacBio high-fidelity (HiFi) reads or Circular Consensus Sequencing (ccs) data, to a reference genome (i.e., the hypothetical master cycle DNA). HiFi-SR also includes useful scripts for organellar genome analyses.
-
 ***We will continuously make upgrades and modifications to hifisr to enhance its functionality and performance.***
 
 ## Installation
@@ -199,8 +197,52 @@ hifisr/
 
 ### Install Snakemake for the local test workflow
 
-Install Snakemake in the same Python environment that will be listed as
-`python` in `deps/soft_paths.txt`:
+On Ubuntu, install the system packages needed to create virtual environments
+and provide Python's `sqlite3` module, which Snakemake requires:
+
+```bash
+sudo apt update
+sudo apt install -y python3-venv sqlite3 libsqlite3-dev
+```
+
+Create and activate a virtual environment from the `hifisr` project root:
+
+```bash
+cd /path/to/hifisr
+python3 -m venv .venv
+source .venv/bin/activate
+python -c "import sqlite3; print(sqlite3.sqlite_version)"
+python -m pip install --upgrade pip
+python -m pip install -r requirements-dev.txt
+```
+
+The `source .venv/bin/activate` command makes `python`, `pip`, and
+`python -m snakemake` use this environment in the current shell session. Confirm
+the active environment and Snakemake installation with:
+
+```bash
+which python
+python -m snakemake --version
+```
+
+If `python -c "import sqlite3"` fails with `No module named '_sqlite3'`, rebuild
+the virtual environment with a Python executable that has sqlite support, for
+example the system Python that passes the same import check.
+
+On Python 3.10, `pip` may install an older Snakemake release. That release
+expects the older PuLP `list_solvers` API, so `requirements-dev.txt` pins
+`pulp==2.7.0`. If Snakemake fails with
+`AttributeError: module 'pulp' has no attribute 'list_solvers'`, reinstall the
+dependencies in the active environment:
+
+```bash
+python -m pip install --force-reinstall "pulp==2.7.0"
+python -m pip install -r requirements-dev.txt
+python -m snakemake --version
+```
+
+If you are not using `requirements-dev.txt`, install Snakemake in the same
+Python environment that will be listed as `python` in `deps/soft_paths.txt`:
 
 ```bash
 python -m pip install snakemake
@@ -210,8 +252,9 @@ python -m pip install snakemake
 
 The repository also contains a semi-automatic Snakemake workflow for rerunning the
 `W3-5-2` local test dataset. The workflow now lives inside the `hifisr`
-project directory, is configured by `workflow/config/w3_5_2.yaml`, and writes
-analysis products under `results/`.
+project directory. The bundled W3-5-2 example config is
+`workflow/config/w3_5_2_macOS.yaml`; copy it for Ubuntu/server runs and replace
+the machine-specific paths. Analysis products are written under `results/`.
 
 ### Required input files
 
@@ -222,7 +265,8 @@ starting from scratch:
   ([CRR384154.fastq.gz](https://download.cncb.ac.cn/gsa/CRA006060/CRR384154/CRR384154.fastq.gz))
 - Mitochondrial reference: `references/Col_mito.fa`
 - Plastid reference: `references/Col_plastid.fa`
-- Software path file: `deps/soft_paths.txt`
+- Software path file: `deps/soft_paths_macOS.txt` for the bundled macOS config,
+  or `deps/soft_paths.txt` for Ubuntu/server configs
 
 The `soft_paths.txt` file must be tab-delimited and include the paths for
 `python`, `minimap2`, `samtools`, `seqkit`, `mecat`, `blastn`, `bcftools`,
@@ -234,6 +278,127 @@ Snakemake and the Python package dependencies listed above are installed. It
 does not need an installed `hifisr` package because the workflow imports
 `hifisr_functions/` from the local source checkout. If the file is stored
 elsewhere, override it with `--config soft_paths=/path/to/soft_paths.txt`.
+
+The default location is:
+
+```text
+/path/to/hifisr/deps/soft_paths.txt
+```
+
+The repository may contain or generate a macOS local-development example named
+`deps/soft_paths_macOS.txt`. Do not use that file on Ubuntu unless every path in
+it has been replaced with Ubuntu executables. For server runs, create
+`deps/soft_paths.txt` yourself or pass a server-specific file with
+`--config soft_paths=...`.
+For macOS local reruns, either copy the macOS example to `deps/soft_paths.txt`
+or pass it explicitly:
+
+```bash
+python -m snakemake --config soft_paths=deps/soft_paths_macOS.txt --cores 8 final
+```
+
+Example contents:
+
+```text
+python	/path/to/hifisr/.venv/bin/python
+minimap2	/path/to/minimap2
+samtools	/path/to/samtools
+seqkit	/path/to/seqkit
+mecat	/path/to/mecat.pl
+blastn	/path/to/blastn
+bcftools	/path/to/bcftools
+bamtools	/path/to/bamtools
+pigz	/path/to/pigz
+bandage	/path/to/Bandage
+hifiasm	/path/to/hifiasm
+flye	/path/to/flye
+canu	/path/to/canu
+```
+
+Replace every `/path/to/...` entry with the real Ubuntu executable path. For
+example, if Flye is installed in the active virtual environment, find it with
+`which flye` and set:
+
+```text
+flye	/path/to/hifisr/.venv/bin/flye
+```
+
+If `draft_for_manual_edit` fails with `/bin/sh: 1: flye: not found`, the `flye`
+line is missing, misspelled, or points to a command that is not on `PATH`.
+Update `deps/soft_paths.txt` or pass a server-specific file with
+`--config soft_paths=/path/to/soft_paths.txt`.
+
+If `soft_paths.txt` is saved outside `deps/`, either specify it in the sample
+config:
+
+```yaml
+soft_paths: "/home/user/software_paths/soft_paths.txt"
+```
+
+or override it at runtime:
+
+```bash
+python -m snakemake --configfile workflow/config/my_sample.yaml \
+  --config soft_paths=/home/user/software_paths/soft_paths.txt \
+  --cores 8 final
+```
+
+### Linux Server Run With Explicit Config
+
+On Linux servers, avoid using the bundled macOS paths. Create a server config
+and a server `soft_paths.txt`, then pass both explicitly in every Snakemake
+command:
+
+```bash
+cd /path/to/hifisr
+cp workflow/config/w3_5_2_macOS.yaml workflow/config/w3_5_2_linux.yaml
+```
+
+Edit `workflow/config/w3_5_2_linux.yaml` so machine-specific inputs point to
+Linux files:
+
+```yaml
+reads: data/W3-5-2.fastq.gz
+soft_paths: "{project_dir}/deps/soft_paths.txt"
+
+references:
+  rotate: false
+  mito: "{project_dir}/references/Col_mito.fa"
+  plastid: "{project_dir}/references/Col_plastid.fa"
+```
+
+Create the Linux software path file:
+
+```bash
+mkdir -p deps
+nano deps/soft_paths.txt
+```
+
+Run with both files specified:
+
+```bash
+python -m snakemake \
+  --configfile workflow/config/w3_5_2_linux.yaml \
+  --config soft_paths=deps/soft_paths.txt \
+  --cores 8 \
+  references_ready
+```
+
+Use the same `--configfile` and `--config soft_paths=...` options for later
+targets, for example:
+
+```bash
+python -m snakemake --configfile workflow/config/w3_5_2_linux.yaml \
+  --config soft_paths=deps/soft_paths.txt --cores 8 reads_ready
+python -m snakemake --configfile workflow/config/w3_5_2_linux.yaml \
+  --config soft_paths=deps/soft_paths.txt --cores 8 draft_for_manual_edit
+python -m snakemake --configfile workflow/config/w3_5_2_linux.yaml \
+  --config soft_paths=deps/soft_paths.txt --cores 8 polish_alignment_variant
+python -m snakemake --configfile workflow/config/w3_5_2_linux.yaml \
+  --config soft_paths=deps/soft_paths.txt --cores 8 verify_corrected_genome
+python -m snakemake --configfile workflow/config/w3_5_2_linux.yaml \
+  --config soft_paths=deps/soft_paths.txt --cores 8 final
+```
 
 The current local test configuration assumes that `Col_mito.fa` and
 `Col_plastid.fa` are already in the desired rotated state, so
@@ -293,6 +458,16 @@ Then run the corrected-genome verification and final targets:
 ```bash
 python -m snakemake --cores 8 verify_corrected_genome
 python -m snakemake --cores 8 final
+```
+
+Use `--cores`, not `--core`, when setting the number of CPU cores.
+On network filesystems or busy servers, add `--latency-wait 60` or a larger
+value if Snakemake reports that a job finished but recently created output
+files are not visible yet:
+
+```bash
+python -m snakemake --configfile workflow/config/w3_5_2_macOS.yaml \
+  --cores 8 --latency-wait 60 draft_for_manual_edit
 ```
 
 After `final` has completed and the outputs have been reviewed, remove large
@@ -379,6 +554,111 @@ and source code remain outside `results/`.
 After `clean`, the kept files remain under `results/`, but rerunning upstream
 analysis steps may require regenerating the removed intermediates.
 
+### Running Other Samples
+
+Use one config file per sample. Copy the W3-5-2 example config and edit the
+sample-specific paths; do not edit `Snakefile` for routine sample runs:
+
+```bash
+cd /path/to/hifisr
+cp workflow/config/w3_5_2_macOS.yaml workflow/config/my_sample.yaml
+```
+
+For Ubuntu/server runs, set `soft_paths` in the copied config to the server
+file, usually `"{project_dir}/deps/soft_paths.txt"`.
+
+Prepare the input files referenced by the new config:
+
+```text
+data/MySample.fastq.gz
+references/MySample_mito.fa
+references/MySample_plastid.fa
+deps/soft_paths.txt
+```
+
+The config should set the sample name, reads, reference FASTA files, and manual
+review paths. A minimal template is:
+
+```yaml
+sample: MySample
+project_dir: "{snakefile_dir}"
+results_dir: "{project_dir}/results"
+
+reads: data/MySample.fastq.gz
+soft_paths: "{project_dir}/deps/soft_paths.txt"
+
+genomes:
+  - mito
+  - plastid
+
+references:
+  rotate: false
+  mito: "{project_dir}/references/MySample_mito.fa"
+  plastid: "{project_dir}/references/MySample_plastid.fa"
+
+draft_edited:
+  mito: "{results_dir}/{sample}/draft_assembly/mito/all_mito_500K_after_rr.edited.fasta"
+  plastid: "{results_dir}/{sample}/draft_assembly/plastid/all_plastid_150K_after_rr.edited.fasta"
+
+run2:
+  name: run_2
+
+pos_ref_alt:
+  mito: "{results_dir}/{sample}/draft_assembly/mito/pos_ref_alt.txt"
+  plastid: "{results_dir}/{sample}/draft_assembly/plastid/pos_ref_alt.txt"
+
+run3:
+  name: run_3
+  genomes:
+    - mito
+```
+
+Run the workflow with `--configfile`:
+
+```bash
+python -m snakemake --configfile workflow/config/my_sample.yaml \
+  --config soft_paths=deps/soft_paths.txt --cores 8 references_ready
+python -m snakemake --configfile workflow/config/my_sample.yaml \
+  --config soft_paths=deps/soft_paths.txt --cores 8 reads_ready
+python -m snakemake --configfile workflow/config/my_sample.yaml \
+  --config soft_paths=deps/soft_paths.txt --cores 8 draft_for_manual_edit
+```
+
+After `draft_for_manual_edit`, inspect and linearize the GFA files manually and
+save edited FASTA files at the paths listed in `draft_edited`. Then continue:
+
+```bash
+python -m snakemake --configfile workflow/config/my_sample.yaml \
+  --config soft_paths=deps/soft_paths.txt --cores 8 polish_alignment_variant
+```
+
+Review the `run_2` coverage plots, bubble plots, and filtered variant tables.
+Write `pos_ref_alt.txt` files at the paths listed in the config; create an empty
+file for any genome with no manual correction. Then run:
+
+```bash
+python -m snakemake --configfile workflow/config/my_sample.yaml \
+  --config soft_paths=deps/soft_paths.txt --cores 8 verify_corrected_genome
+python -m snakemake --configfile workflow/config/my_sample.yaml \
+  --config soft_paths=deps/soft_paths.txt --cores 8 final
+```
+
+Outputs are written under:
+
+```text
+results/MySample/
+```
+
+If a sample should run only one organellar genome, edit `genomes`. If no
+corrected-genome verification is needed, keep `run3.name` but set
+`run3.genomes` to an empty list:
+
+```yaml
+run3:
+  name: run_3
+  genomes: []
+```
+
 ## Exmaples
 
 ### Example 1: Wild-type *Arabidopsis thaliana* (Col-0 ecotype)
@@ -405,8 +685,8 @@ Analysis of an example wild-type *Arabidopsis thaliana* dataset Col-CEN ([ERR621
 python get_mtpt_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi001 /mnt/software/scripts/results/mito_rotated_293434.fasta /mnt/software/scripts/results/plastid_rotated_61049.fasta /mnt/software/scripts/results/Col-CEN.fastq 32
 ```
 
-| All                                                       | mitochondria                                                        | plastid                                                           |
-| --------------------------------------------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| All                                                                                                                           | mitochondria                                                                                                                            | plastid                                                                                                                               |
+| ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | ![All](001.植物细胞器基因组组装后校验/版本A/细胞器代码库/hifisr-dev/hifisr/examples/example_1/all_length_qual_distribution.jpg) | ![mitochondria](001.植物细胞器基因组组装后校验/版本A/细胞器代码库/hifisr-dev/hifisr/examples/example_1/mito_length_qual_distribution.jpg) | ![plastid](001.植物细胞器基因组组装后校验/版本A/细胞器代码库/hifisr-dev/hifisr/examples/example_1/plastid_length_qual_distribution.jpg) |
 
 #### Calling and calculating the frequencies of SVs, SNVs and small InDels with plotting
@@ -424,8 +704,8 @@ python get_variants_in_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt
 python get_variants_in_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi001 plastid run_1 /mnt/software/scripts/results/plastid_rotated_61049.fasta /mnt/software/scripts/results/ATHiFi001/reads/sample_reads/sample_4000_plastid.fastq 32
 ```
 
-| mitochondria                                                           | plastid                                                                   |
-| ---------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| mitochondria                                        | plastid                                                |
+| --------------------------------------------------- | ------------------------------------------------------ |
 | ![One-rearrangements](mito_bubble_type_2_rep_raw.jpg) | ![One-rearrangements](plastid_bubble_type_2_rep_raw.jpg) |
 | ![Coverage](mito_coverage_plot.jpg)                   | ![Coverage](plastid_coverage_plot.jpg)                   |
 
@@ -455,8 +735,8 @@ Analysis of the *Amborella trichopoda* dataset (var. Santa Cruz 75) ([SRR2888892
 python get_mtpt_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt Amborella_1 /mnt/software/scripts/results/mt_all.fasta /mnt/software/scripts/results/AJ506156.2_pt.fasta /mnt/software/scripts/results/SRR28888927.1.fastq.gz 32
 ```
 
-| All                                                       | mitochondria                                                        | plastid                                                           |
-| --------------------------------------------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| All                                                                                                                           | mitochondria                                                                                                                            | plastid                                                                                                                               |
+| ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | ![All](001.植物细胞器基因组组装后校验/版本A/细胞器代码库/hifisr-dev/hifisr/examples/example_2/all_length_qual_distribution.jpg) | ![mitochondria](001.植物细胞器基因组组装后校验/版本A/细胞器代码库/hifisr-dev/hifisr/examples/example_2/mito_length_qual_distribution.jpg) | ![plastid](001.植物细胞器基因组组装后校验/版本A/细胞器代码库/hifisr-dev/hifisr/examples/example_2/plastid_length_qual_distribution.jpg) |
 
 #### Get the draft assembly of mitochondrial genome
@@ -472,8 +752,8 @@ python sample_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt Amborell
 python get_draft_assembly.py /mnt/software/scripts/hifisr/deps/soft_paths.txt Amborella_1 mito mt_all.fasta sample_10000_mito.fastq 20
 ```
 
-| MECAT2 + metaFlye                                         | metaFlye                                                |
-| --------------------------------------------------------- | ------------------------------------------------------- |
+| MECAT2 + metaFlye                      | metaFlye                             |
+| -------------------------------------- | ------------------------------------ |
 | ![before](mecat_mito_500K_before_rr.jpg) | ![before](all_mito_500K_before_rr.jpg) |
 | ![after](mecat_mito_500K_after_rr.jpg)   | ![after](all_mito_500K_after_rr.jpg)   |
 
@@ -508,8 +788,8 @@ python get_polished_assembly.py /mnt/software/scripts/hifisr/deps/soft_paths.txt
 python get_variants_in_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt Amborella_1 mito contig_4_v2 mito_flye_polish_aligned.fasta contig_4.fastq 32
 ```
 
-| Coverage in Round 1                                        | Coverage in Round 2                                        |
-| ---------------------------------------------------------- | ---------------------------------------------------------- |
+| Coverage in Round 1                     | Coverage in Round 2                     |
+| --------------------------------------- | --------------------------------------- |
 | ![Round 1](coverage_contig_4_Round_1.jpg) | ![Round 2](coverage_contig_4_Round_2.jpg) |
 
 #### Correct contig_5
@@ -533,12 +813,12 @@ python get_polished_assembly.py /mnt/software/scripts/hifisr/deps/soft_paths.txt
 python get_polished_assembly.py /mnt/software/scripts/hifisr/deps/soft_paths.txt Amborella_1 mito contig_5_hifiasm_p_ctg_run_3 mito_flye_polish_aligned_cor.fasta contig_5.fastq 32
 ```
 
-| Coverage in Round 1                                        | Coverage in Round 2                                        |
-| ---------------------------------------------------------- | ---------------------------------------------------------- |
+| Coverage in Round 1                     | Coverage in Round 2                     |
+| --------------------------------------- | --------------------------------------- |
 | ![Round 1](coverage_contig_5_Round_1.jpg) | ![Round 2](coverage_contig_5_Round_2.jpg) |
 
-| Coverage in Round 3                                        | Coverage in Round 4                                        |
-| ---------------------------------------------------------- | ---------------------------------------------------------- |
+| Coverage in Round 3                     | Coverage in Round 4                     |
+| --------------------------------------- | --------------------------------------- |
 | ![Round 3](coverage_contig_5_Round_3.jpg) | ![Round 4](coverage_contig_5_Round_4.jpg) |
 
 ## Citations

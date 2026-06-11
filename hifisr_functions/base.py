@@ -1,5 +1,17 @@
+import os
+import shutil
 import subprocess
 import sys
+
+
+def run_checked(commands):
+    print("+ " + commands, file=sys.stderr)
+    completed = subprocess.run(commands, shell=True)
+    if completed.returncode != 0:
+        raise RuntimeError(
+            f"Command failed with exit code {completed.returncode}: {commands}"
+        )
+    return completed.returncode
 
 
 def get_cli_output_lines(commands, side_effect=False):
@@ -38,3 +50,26 @@ def load_soft_paths(soft_paths_file):
         print(key + " -> " + soft_paths_dict[key], file=sys.stderr)
     print("", file=sys.stderr)
     return soft_paths_dict
+
+
+def require_soft_paths(soft_paths_dict, required_tools):
+    errors = []
+    for tool in required_tools:
+        executable = soft_paths_dict.get(tool)
+        if not executable:
+            errors.append(f"{tool}: missing from soft_paths.txt")
+            continue
+
+        if os.path.isabs(executable):
+            if not os.path.exists(executable):
+                errors.append(f"{tool}: path does not exist: {executable}")
+            elif not os.access(executable, os.X_OK):
+                errors.append(f"{tool}: path is not executable: {executable}")
+        elif shutil.which(executable) is None:
+            errors.append(f"{tool}: command not found on PATH: {executable}")
+
+    if errors:
+        raise RuntimeError(
+            "Invalid soft_paths.txt entries:\n"
+            + "\n".join("  - " + error for error in errors)
+        )

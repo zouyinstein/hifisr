@@ -6,10 +6,26 @@ import hifisr_functions.reports as hfrps
 import os
 
 
+def require_outputs(paths):
+    missing = [path for path in paths if not os.path.exists(path)]
+    empty = [path for path in paths if os.path.exists(path) and os.path.getsize(path) == 0]
+    if missing or empty:
+        if missing:
+            print("Missing expected draft outputs:", file=sys.stderr)
+            for path in missing:
+                print("  " + path, file=sys.stderr)
+        if empty:
+            print("Empty expected draft outputs:", file=sys.stderr)
+            for path in empty:
+                print("  " + path, file=sys.stderr)
+        sys.exit(1)
+
+
 # Usage: python get_draft_assembly.py soft_paths_file genome bait_path reads_fastq threads
 # Load the soft paths
 soft_paths_file = sys.argv[1]
 soft_paths_dict = hfbase.load_soft_paths(soft_paths_file)
+hfbase.require_soft_paths(soft_paths_dict, ["mecat", "seqkit", "flye", "bandage"])
 
 # Parse other arguments
 sample_index = sys.argv[2] # ATHiFi001
@@ -40,17 +56,26 @@ os.chdir(genome)
 
 # add sample_index
 command_1 = "ln -sf " + reads_absolute_path + " reads.fastq"
-ret = hfbase.get_cli_output_lines(command_1, side_effect = True)
+hfbase.run_checked(command_1)
 if genome == "plastid":
     genome_size = 150
 elif genome == "mito":
     genome_size = 500
+else:
+    print("Unsupported genome: " + genome, file=sys.stderr)
+    sys.exit(1)
 
 hfref.mecat_cns(genome, genome_size, "reads.fastq", soft_paths_dict, threads)
 hfref.flye_assemble("mecat", genome, genome_size, "mecat_" + genome + "_" + str(genome_size) + ".fasta", soft_paths_dict, "HiFi", threads, correction=True)
 # convert reads.fastq to fasta using seqkit
 command_2 = soft_paths_dict.get("seqkit") + " fq2fa reads.fastq -o reads.fasta -j " + threads
-hfbase.get_cli_output_lines(command_2, side_effect = True)
+hfbase.run_checked(command_2)
 hfref.flye_assemble("all", genome, genome_size, "reads.fasta", soft_paths_dict, "HiFi", threads, correction=False)
 hfrps.get_gfa_blastn_png(genome_absolute_path, soft_paths_dict)
+expected_outputs = []
+for prefix in ["mecat", "all"]:
+    for suffix in ["before_rr", "after_rr"]:
+        expected_outputs.append(f"{prefix}_{genome}_{genome_size}K_{suffix}.gfa")
+        expected_outputs.append(f"{prefix}_{genome}_{genome_size}K_{suffix}.png")
+require_outputs(expected_outputs)
 os.chdir("../../..")

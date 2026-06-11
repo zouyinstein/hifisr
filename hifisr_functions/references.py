@@ -133,7 +133,7 @@ def mecat_cns(genome, genome_size, reads, soft_paths_dict, threads):
     command_7 = "cp mecat_" + genome + "_" + str(genome_size) + "/1-consensus/cns_final.fasta mecat_" + genome + "_" + str(genome_size) + ".fasta"
     command_8 = "rm -rf mecat_" + genome + "_" + str(genome_size) + " mecat_" + genome + "_" + str(genome_size) + "_config.txt"
     commands = command_1 + " && " + command_2 + " && " + command_3 + " && " + command_4 + " && " + command_5 + " && " + command_6 + " && " + command_7 + " && " + command_8
-    ret = hfbase.get_cli_output_lines(commands, side_effect = True)
+    hfbase.run_checked(commands)
     return
 
 
@@ -159,7 +159,7 @@ def flye_assemble(prefix, genome, genome_size, reads, soft_paths_dict, sample_pl
     command_3 = "cp flye_" + prefix + "_" + genome + "_" + str(genome_size) + "K/20-repeat/graph_before_rr.gfa " + prefix + "_" + genome + "_" + str(genome_size) + "K_before_rr.gfa"
     command_4 = "rm -rf flye_" + prefix + "_" + genome + "_" + str(genome_size) + "K"
     commands = command_1 + " && " + command_2 + " && " + command_3 + " && " + command_4
-    ret = hfbase.get_cli_output_lines(commands, side_effect = True)
+    hfbase.run_checked(commands)
     return
 
 

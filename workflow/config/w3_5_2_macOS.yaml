@@ -1,4 +1,4 @@
-# Local workflow config for rerunning W3-5-2 from the hifisr project root.
+# macOS local workflow config for rerunning W3-5-2 from the hifisr project root.
 
 sample: W3-5-2
 project_dir: "{snakefile_dir}"
@@ -6,7 +6,7 @@ results_dir: "{project_dir}/results"
 
 reads: data/W3-5-2.fastq.gz
 
-soft_paths: "{project_dir}/deps/soft_paths.txt"
+soft_paths: "{project_dir}/deps/soft_paths_macOS.txt"
 
 genomes:
   - mito

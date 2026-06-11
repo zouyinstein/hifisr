@@ -1,4 +1,4 @@
-configfile: "workflow/config/w3_5_2.yaml"
+configfile: "workflow/config/w3_5_2_macOS.yaml"
 
 from pathlib import Path
 
