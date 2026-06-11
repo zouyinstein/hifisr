@@ -44,21 +44,21 @@ hfref.replace_fasta_id("plastid", plastid_absolute_path, "plastid.fa")
 if reads_absolute_path.endswith(".gz"):
     command_1 = "ln -sf " + reads_absolute_path + " " + sample_index + ".fastq.gz"
     ret = hfbase.get_cli_output_lines(command_1, side_effect = True)
-    hfreads.split_mtpt_reads(sample_index, sample_index + ".fastq.gz", "HiFi", "mito.fa", "plastid.fa", soft_paths_dict, threads)
+    hfreads.split_mtpt_reads(sample_index, sample_index + ".fastq.gz", "ONT", "mito.fa", "plastid.fa", soft_paths_dict, threads)
     # get the stats of the reads with plots
     id_length_qual_file, total_read_number, total_bases = hfrps.get_fastq_stats("all", sample_index + ".fastq.gz", soft_paths_dict, threads)
-    hfrps.plot_length_qual("all", "HiFi", id_length_qual_file, total_read_number, total_bases)
+    hfrps.plot_length_qual("all", "ONT", id_length_qual_file, total_read_number, total_bases)
 else:
     command_1 = "ln -sf " + reads_absolute_path + " " + sample_index + ".fastq"
     ret = hfbase.get_cli_output_lines(command_1, side_effect = True)
-    hfreads.split_mtpt_reads(sample_index, sample_index + ".fastq", "HiFi", "mito.fa", "plastid.fa", soft_paths_dict, threads)
+    hfreads.split_mtpt_reads(sample_index, sample_index + ".fastq", "ONT", "mito.fa", "plastid.fa", soft_paths_dict, threads)
     # get the stats of the reads with plots
     id_length_qual_file, total_read_number, total_bases = hfrps.get_fastq_stats("all", sample_index + ".fastq", soft_paths_dict, threads)
-    hfrps.plot_length_qual("all", "HiFi", id_length_qual_file, total_read_number, total_bases)
+    hfrps.plot_length_qual("all", "ONT", id_length_qual_file, total_read_number, total_bases)
     
 id_length_qual_file, total_read_number, total_bases = hfrps.get_fastq_stats("mito", sample_index + "_mito.fastq", soft_paths_dict, threads)
-hfrps.plot_length_qual("mito", "HiFi", id_length_qual_file, total_read_number, total_bases)
+hfrps.plot_length_qual("mito", "ONT", id_length_qual_file, total_read_number, total_bases)
 id_length_qual_file, total_read_number, total_bases = hfrps.get_fastq_stats("plastid", sample_index + "_plastid.fastq", soft_paths_dict, threads)
-hfrps.plot_length_qual("plastid", "HiFi", id_length_qual_file, total_read_number, total_bases)
+hfrps.plot_length_qual("plastid", "ONT", id_length_qual_file, total_read_number, total_bases)
 
 os.chdir("../..")

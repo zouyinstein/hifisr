@@ -1,4 +1,5 @@
 import sys
+import _bootstrap  # noqa: F401
 import hifisr_functions.base as hfbase
 import hifisr_functions.references as hfref
 

@@ -1,4 +1,5 @@
 import sys
+import _bootstrap  # noqa: F401
 import hifisr_functions.base as hfbase
 import hifisr_functions.reads as hfreads
 import hifisr_functions.reports as hfrps
@@ -38,8 +39,14 @@ hfbase.get_cli_output_lines(command_1, side_effect = True)
 # extract the ids of the sampled reads and extract the reads
 ids_file = "sample_reads/sample_" + str(sample_num) + "_" + genome + "_ids.txt"
 fastq_file = sample_index + "_" + genome + ".fastq"
-command_1 = "cut -f 1 sample_reads/sample_" + str(sample_num) + "_" + genome + "_id_length_qual.txt > " + ids_file
-command_2 = soft_paths_dict.get("seqkit") + " grep -f " + ids_file + " " + fastq_file + " > sample_reads/sample_" + str(sample_num) + "_" + genome + ".fastq"
-hfbase.get_cli_output_lines(command_1 + " && " + command_2, side_effect = True)
+# if os.path.exists(fastq_file):
+#     # compress using pigz
+#     command_1 = soft_paths_dict.get("pigz") + " -p 8 " + fastq_file
+#     hfbase.get_cli_output_lines(command_1, side_effect = True)
+#     fastq_file = fastq_file + ".gz"
+
+command_2 = "cut -f 1 sample_reads/sample_" + str(sample_num) + "_" + genome + "_id_length_qual.txt > " + ids_file
+command_3 = soft_paths_dict.get("seqkit") + " grep -f " + ids_file + " " + fastq_file + " > sample_reads/sample_" + str(sample_num) + "_" + genome + ".fastq"
+hfbase.get_cli_output_lines(command_2 + " && " + command_3, side_effect = True)
 
 os.chdir("../..")

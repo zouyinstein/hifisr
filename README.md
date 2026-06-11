@@ -55,6 +55,8 @@ winnowmap	/mnt/software/scripts/hifisr/deps/Winnowmap-2.03/bin/winnowmap
 pigz	/mnt/software/scripts/hifisr/deps/pigz/pigz
 bandage	/mnt/software/scripts/hifisr/deps/Bandage
 hifiasm	/mnt/software/scripts/hifisr/deps/hifiasm/hifiasm
+flye	/mnt/software/scripts/hifisr/deps/Flye/bin/flye
+canu	/mnt/software/scripts/hifisr/deps/canu-2.3/bin/canu
 ```
 
 #### Install minimap2
@@ -177,11 +179,205 @@ git clone https://github.com/chhylp123/hifiasm
 cd hifiasm && make -j 8
 ```
 
-### Install hifisr to the environment
+### Use the source checkout directly
+
+The local test workflow runs directly from this source tree and does not
+require installing the `hifisr` package into the virtual environment. Shared Python code is maintained in
+`hifisr_functions/`, and the entry-point scripts under `analysis_scripts/` load
+that local source directory through `analysis_scripts/_bootstrap.py`.
+
+Keep this directory layout intact when copying the workflow to a server:
+
+```text
+hifisr/
+  analysis_scripts/
+    _bootstrap.py
+  hifisr_functions/
+  workflow/
+  Snakefile
+```
+
+### Install Snakemake for the local test workflow
+
+Install Snakemake in the same Python environment that will be listed as
+`python` in `deps/soft_paths.txt`:
 
 ```bash
-pip install hifisr==0.5.0
+python -m pip install snakemake
 ```
+
+## Local Snakemake Test Workflow
+
+The repository also contains a semi-automatic Snakemake workflow for rerunning the
+`W3-5-2` local test dataset. The workflow now lives inside the `hifisr`
+project directory, is configured by `workflow/config/w3_5_2.yaml`, and writes
+analysis products under `results/`.
+
+### Required input files
+
+Run from the `hifisr` project root and prepare the following files before
+starting from scratch:
+
+- HiFi reads: `data/W3-5-2.fastq.gz`
+  ([CRR384154.fastq.gz](https://download.cncb.ac.cn/gsa/CRA006060/CRR384154/CRR384154.fastq.gz))
+- Mitochondrial reference: `references/Col_mito.fa`
+- Plastid reference: `references/Col_plastid.fa`
+- Software path file: `deps/soft_paths.txt`
+
+The `soft_paths.txt` file must be tab-delimited and include the paths for
+`python`, `minimap2`, `samtools`, `seqkit`, `mecat`, `blastn`, `bcftools`,
+`bamtools`, `pigz`, `bandage`, `hifiasm`, `flye`, and `canu`. The workflow uses
+this file to derive executable paths and PATH entries, so on an Ubuntu server
+the only machine-specific workflow file should be the corresponding
+`soft_paths.txt`. The `python` entry should point to an environment where
+Snakemake and the Python package dependencies listed above are installed. It
+does not need an installed `hifisr` package because the workflow imports
+`hifisr_functions/` from the local source checkout. If the file is stored
+elsewhere, override it with `--config soft_paths=/path/to/soft_paths.txt`.
+
+The current local test configuration assumes that `Col_mito.fa` and
+`Col_plastid.fa` are already in the desired rotated state, so
+`references.rotate` is set to `false`.
+
+### Run commands
+
+Run the workflow from the `hifisr` project root. The Python used for Snakemake
+should be the same environment listed as `python` in `deps/soft_paths.txt`; the
+workflow scripts will import local code from `hifisr_functions/`.
+
+```bash
+cd /path/to/hifisr
+python -m snakemake --cores 8 references_ready
+python -m snakemake --cores 8 reads_ready
+python -m snakemake --cores 8 draft_for_manual_edit
+```
+
+After `draft_for_manual_edit`, inspect and linearize the GFA files manually,
+for example with GFA_Editor, and save the edited FASTA files at:
+
+```text
+results/W3-5-2/draft_assembly/mito/all_mito_500K_after_rr.edited.fasta
+results/W3-5-2/draft_assembly/plastid/all_plastid_150K_after_rr.edited.fasta
+```
+
+Then continue with polish/alignment and variant calling:
+
+```bash
+python -m snakemake --cores 8 polish_alignment_variant
+```
+
+The `polish_alignment_variant` target generates both mitochondrial and plastid
+`run_2` outputs.
+Run this target if you want to inspect mitochondrial `run_2` before applying
+manual reference corrections.
+
+After `polish_alignment_variant`, review the coverage plots, bubble plots, and
+filtered variant tables:
+
+```text
+results/W3-5-2/{genome}/run_2/coverage_*.png
+results/W3-5-2/{genome}/run_2/bubble_type_2_rep_raw.pdf
+results/W3-5-2/{genome}/run_2/variants_anno_combined_depth_frq_filter.xlsx
+```
+
+Write manual corrections as tab-delimited `pos ref alt` rows. Use an empty file
+when no correction is needed:
+
+```text
+results/W3-5-2/draft_assembly/mito/pos_ref_alt.txt
+results/W3-5-2/draft_assembly/plastid/pos_ref_alt.txt
+```
+
+Then run the corrected-genome verification and final targets:
+
+```bash
+python -m snakemake --cores 8 verify_corrected_genome
+python -m snakemake --cores 8 final
+```
+
+After `final` has completed and the outputs have been reviewed, remove large
+regenerable intermediates with:
+
+```bash
+python -m snakemake --cores 1 clean
+```
+
+If `snakemake` is available on `PATH`, the equivalent command is:
+
+```bash
+snakemake clean
+```
+
+The `clean` target keeps the result-interpretation files, including final and
+intermediate Excel tables, coverage plots, bubble plots, edited/corrected FASTA
+files, `pos_ref_alt.txt`, small read-statistics files, and logs.
+
+It deletes only the following regenerable files and directories under
+`results/`:
+
+- `results/{sample}/reads/{sample}_{genome}.fastq`
+- `results/{sample}/reads/sample_reads/sample_4000_{genome}.fastq`
+- `results/{sample}/{genome}/{run}/reads.fasta`
+- `results/{sample}/{genome}/{run}/new_reads.fasta`
+- `results/{sample}/{genome}/{run}/FL.fasta`
+- `results/{sample}/{genome}/{run}/partial.fasta`
+- `results/{sample}/{genome}/{run}/variant_cov.fasta`
+- `results/.tmp/`
+- `results/.matplotlib/`
+
+For the default `W3-5-2` config, `{genome}` expands to `mito` and `plastid`.
+The `{run}` paths include `run_2` for both genomes and `run_3` for genomes
+listed in `run3.genomes` (`mito` by default).
+
+To add or remove files from the clean list, edit `Snakefile`:
+
+- Add or remove file paths in `clean_intermediate_paths()`.
+- Add or remove removable directories in `clean_intermediate_dirs()`.
+
+After changing the clean list, update this README section and verify the target
+before deleting files:
+
+```bash
+python -m snakemake -n --cores 1 clean
+```
+
+Use `-n` for a dry run:
+
+```bash
+python -m snakemake -n --cores 8 final
+```
+
+### Output layout
+
+Analysis products, Snakemake logs, run-local caches, and temporary files are
+written under `results/`, including:
+
+```text
+results/W3-5-2/reads/
+results/W3-5-2/draft_assembly/
+results/W3-5-2/mito/run_2/
+results/W3-5-2/mito/run_3/
+results/W3-5-2/plastid/run_2/
+results/W3-5-2/logs/snakemake/
+results/.tmp/
+results/.cache/
+results/.matplotlib/
+```
+
+The `final` target uses `run_3` for genomes listed in `run3.genomes` and
+otherwise uses `run_2`. In the current `W3-5-2` test configuration, `run_3` is
+enabled for mitochondria only, so the final target depends on:
+
+```text
+results/W3-5-2/mito/run_3/variants_anno_combined_depth_frq_filter.xlsx
+results/W3-5-2/plastid/run_2/variants_anno_combined_depth_frq_filter.xlsx
+```
+
+Input reads, reference FASTA files, the virtual environment, workflow metadata,
+and source code remain outside `results/`.
+
+After `clean`, the kept files remain under `results/`, but rerunning upstream
+analysis steps may require regenerating the removed intermediates.
 
 ## Exmaples
 
@@ -211,7 +407,7 @@ python get_mtpt_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi
 
 | All                                                       | mitochondria                                                        | plastid                                                           |
 | --------------------------------------------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| ![All](examples/example_1/all_length_qual_distribution.jpg) | ![mitochondria](examples/example_1/mito_length_qual_distribution.jpg) | ![plastid](examples/example_1/plastid_length_qual_distribution.jpg) |
+| ![All](001.植物细胞器基因组组装后校验/版本A/细胞器代码库/hifisr-dev/hifisr/examples/example_1/all_length_qual_distribution.jpg) | ![mitochondria](001.植物细胞器基因组组装后校验/版本A/细胞器代码库/hifisr-dev/hifisr/examples/example_1/mito_length_qual_distribution.jpg) | ![plastid](001.植物细胞器基因组组装后校验/版本A/细胞器代码库/hifisr-dev/hifisr/examples/example_1/plastid_length_qual_distribution.jpg) |
 
 #### Calling and calculating the frequencies of SVs, SNVs and small InDels with plotting
 
@@ -230,8 +426,8 @@ python get_variants_in_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt
 
 | mitochondria                                                           | plastid                                                                   |
 | ---------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| ![One-rearrangements](examples/example_1/mito_bubble_type_2_rep_raw.jpg) | ![One-rearrangements](examples/example_1/plastid_bubble_type_2_rep_raw.jpg) |
-| ![Coverage](examples/example_1/mito_coverage_plot.jpg)                   | ![Coverage](examples/example_1/plastid_coverage_plot.jpg)                   |
+| ![One-rearrangements](mito_bubble_type_2_rep_raw.jpg) | ![One-rearrangements](plastid_bubble_type_2_rep_raw.jpg) |
+| ![Coverage](mito_coverage_plot.jpg)                   | ![Coverage](plastid_coverage_plot.jpg)                   |
 
 ### Example 2: *Amborella trichopoda* (var. Santa Cruz 75)
 
@@ -261,7 +457,7 @@ python get_mtpt_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt Ambore
 
 | All                                                       | mitochondria                                                        | plastid                                                           |
 | --------------------------------------------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| ![All](examples/example_2/all_length_qual_distribution.jpg) | ![mitochondria](examples/example_2/mito_length_qual_distribution.jpg) | ![plastid](examples/example_2/plastid_length_qual_distribution.jpg) |
+| ![All](001.植物细胞器基因组组装后校验/版本A/细胞器代码库/hifisr-dev/hifisr/examples/example_2/all_length_qual_distribution.jpg) | ![mitochondria](001.植物细胞器基因组组装后校验/版本A/细胞器代码库/hifisr-dev/hifisr/examples/example_2/mito_length_qual_distribution.jpg) | ![plastid](001.植物细胞器基因组组装后校验/版本A/细胞器代码库/hifisr-dev/hifisr/examples/example_2/plastid_length_qual_distribution.jpg) |
 
 #### Get the draft assembly of mitochondrial genome
 
@@ -278,8 +474,8 @@ python get_draft_assembly.py /mnt/software/scripts/hifisr/deps/soft_paths.txt Am
 
 | MECAT2 + metaFlye                                         | metaFlye                                                |
 | --------------------------------------------------------- | ------------------------------------------------------- |
-| ![before](examples/example_2/mecat_mito_500K_before_rr.jpg) | ![before](examples/example_2/all_mito_500K_before_rr.jpg) |
-| ![after](examples/example_2/mecat_mito_500K_after_rr.jpg)   | ![after](examples/example_2/all_mito_500K_after_rr.jpg)   |
+| ![before](mecat_mito_500K_before_rr.jpg) | ![before](all_mito_500K_before_rr.jpg) |
+| ![after](mecat_mito_500K_after_rr.jpg)   | ![after](all_mito_500K_after_rr.jpg)   |
 
 #### Choose the assembly (upper right, metaFlye before repeat resolution, and without running MECAT2) for downstream analysis
 
@@ -314,7 +510,7 @@ python get_variants_in_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt
 
 | Coverage in Round 1                                        | Coverage in Round 2                                        |
 | ---------------------------------------------------------- | ---------------------------------------------------------- |
-| ![Round 1](examples/example_2/coverage_contig_4_Round_1.jpg) | ![Round 2](examples/example_2/coverage_contig_4_Round_2.jpg) |
+| ![Round 1](coverage_contig_4_Round_1.jpg) | ![Round 2](coverage_contig_4_Round_2.jpg) |
 
 #### Correct contig_5
 
@@ -339,11 +535,11 @@ python get_polished_assembly.py /mnt/software/scripts/hifisr/deps/soft_paths.txt
 
 | Coverage in Round 1                                        | Coverage in Round 2                                        |
 | ---------------------------------------------------------- | ---------------------------------------------------------- |
-| ![Round 1](examples/example_2/coverage_contig_5_Round_1.jpg) | ![Round 2](examples/example_2/coverage_contig_5_Round_2.jpg) |
+| ![Round 1](coverage_contig_5_Round_1.jpg) | ![Round 2](coverage_contig_5_Round_2.jpg) |
 
 | Coverage in Round 3                                        | Coverage in Round 4                                        |
 | ---------------------------------------------------------- | ---------------------------------------------------------- |
-| ![Round 3](examples/example_2/coverage_contig_5_Round_3.jpg) | ![Round 4](examples/example_2/coverage_contig_5_Round_4.jpg) |
+| ![Round 3](coverage_contig_5_Round_3.jpg) | ![Round 4](coverage_contig_5_Round_4.jpg) |
 
 ## Citations
 

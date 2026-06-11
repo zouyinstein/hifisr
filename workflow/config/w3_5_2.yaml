@@ -1,0 +1,41 @@
+# Local workflow config for rerunning W3-5-2 from the hifisr project root.
+
+sample: W3-5-2
+project_dir: "{snakefile_dir}"
+results_dir: "{project_dir}/results"
+
+reads: data/W3-5-2.fastq.gz
+
+soft_paths: "{project_dir}/deps/soft_paths.txt"
+
+genomes:
+  - mito
+  - plastid
+
+threads:
+  reads: 8
+  draft: 8
+  polish: 8
+  variants: 8
+
+references:
+  # Current repository references are already rotated.
+  rotate: false
+  mito: "{project_dir}/references/Col_mito.fa"
+  plastid: "{project_dir}/references/Col_plastid.fa"
+
+draft_edited:
+  mito: "{results_dir}/{sample}/draft_assembly/mito/all_mito_500K_after_rr.edited.fasta"
+  plastid: "{results_dir}/{sample}/draft_assembly/plastid/all_plastid_150K_after_rr.edited.fasta"
+
+run2:
+  name: run_2
+
+pos_ref_alt:
+  mito: "{results_dir}/{sample}/draft_assembly/mito/pos_ref_alt.txt"
+  plastid: "{results_dir}/{sample}/draft_assembly/plastid/pos_ref_alt.txt"
+
+run3:
+  name: run_3
+  genomes:
+    - mito

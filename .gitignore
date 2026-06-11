@@ -1,9 +1,15 @@
-hifisr_functions
-setup.py
 hifisr_env
 deps
 results
+results_*/
+.snakemake
 dev_scripts
 hifisr.egg-info
 build
 dist
+.venv
+.pytest_cache
+.ruff_cache
+__pycache__
+*.pyc
+.DS_Store

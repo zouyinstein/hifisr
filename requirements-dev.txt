@@ -1,0 +1,11 @@
+biopython
+fastexcel
+matplotlib
+numpy
+openpyxl
+pandas
+polars
+pysam
+snakemake
+xlsxwriter
+pytest

@@ -3,6 +3,7 @@ import _bootstrap  # noqa: F401
 import hifisr_functions.base as hfbase
 import hifisr_functions.references as hfref
 import hifisr_functions.reports as hfrps
+import sys
 import os
 
 
@@ -16,8 +17,9 @@ sample_index = sys.argv[2] # ATHiFi001
 genome = sys.argv[3] # mito or plastid
 genome_absolute_path = sys.argv[4] # for bait genome
 before_fasta_absolute_path = sys.argv[5] # draft.fasta
-reads_absolute_path = sys.argv[6] # ATHiFi001.fastq
-threads = sys.argv[7]
+flipped_fasta_path = sys.argv[6]
+flip_start = sys.argv[7]
+flip_end = sys.argv[8]
 
 # check absolute paths
 if not os.path.isabs(genome_absolute_path):
@@ -25,9 +27,6 @@ if not os.path.isabs(genome_absolute_path):
     sys.exit(1)
 if not os.path.isabs(before_fasta_absolute_path):
     print("The path to the draft fasta file is not an absolute path.")
-    sys.exit(1)
-if not os.path.isabs(reads_absolute_path):
-    print("The path to the reads fastq file is not an absolute path.")
     sys.exit(1)
 
 # create project folder by sample_index
@@ -41,18 +40,16 @@ if not os.path.exists(genome):
     os.makedirs(genome)
 os.chdir(genome)
 
-hfref.replace_fasta_id(genome, before_fasta_absolute_path, "input_" + genome + ".fa")
-rot_step = hfref.rotate_ref_to_non_repeat_region(genome, "input_" + genome + ".fa", soft_paths_dict, rotation=True)
-hfbase.get_cli_output_lines("rm input_" + genome + ".fa")
-hfref.flye_polish(genome, genome + "_rotated_" + str(rot_step) + ".fasta", genome + "_flye_polish", reads_absolute_path, soft_paths_dict, "HiFi", threads, correction=True)
-# check the SVs by BLASTn
-adj_count, rc_or_not, rot_or_not = hfref.aln_to_ref(genome, genome_absolute_path, genome + "_flye_polish.fasta", genome + "_flye_polish_aligned.fasta", "all_sorted_blastn_alignments.txt", soft_paths_dict)
-hfrps.convert_blastn_alignments_to_table("all_sorted_blastn_alignments.txt", genome + "_flye_polish_aligned_blastn_alignments.xlsx")
+# flipping via perfect repeats
+hfref.get_flipped_fasta(before_fasta_absolute_path, flipped_fasta_path, flip_start, flip_end)
+adj_count, rc_or_not, rot_or_not = hfref.aln_to_ref(genome, genome_absolute_path, flipped_fasta_path, genome + "_flye_polish_aligned_flipped_IR_aligned.fasta", "all_sorted_blastn_alignments.txt", soft_paths_dict)
+hfrps.convert_blastn_alignments_to_table("all_sorted_blastn_alignments.txt", genome + "_flye_polish_aligned_flipped_IR_aligned_blastn_alignments.xlsx") # Overwrite the previous file
 if adj_count == 0:
     print("No change.")
 if rc_or_not == 1:
     print("The draft genome has been reverse complemented.")
 if rot_or_not == 1:
     print("The draft genome has been rotated.")
+
 
 os.chdir("../../..")

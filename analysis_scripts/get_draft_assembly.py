@@ -1,4 +1,5 @@
 import sys
+import _bootstrap  # noqa: F401
 import hifisr_functions.base as hfbase
 import hifisr_functions.references as hfref
 import hifisr_functions.reports as hfrps
@@ -46,10 +47,10 @@ elif genome == "mito":
     genome_size = 500
 
 hfref.mecat_cns(genome, genome_size, "reads.fastq", soft_paths_dict, threads)
-hfref.flye_assemble("mecat", genome, genome_size, "mecat_" + genome + "_" + str(genome_size) + ".fasta", "HiFi", threads, correction=True)
+hfref.flye_assemble("mecat", genome, genome_size, "mecat_" + genome + "_" + str(genome_size) + ".fasta", soft_paths_dict, "HiFi", threads, correction=True)
 # convert reads.fastq to fasta using seqkit
 command_2 = soft_paths_dict.get("seqkit") + " fq2fa reads.fastq -o reads.fasta -j " + threads
 hfbase.get_cli_output_lines(command_2, side_effect = True)
-hfref.flye_assemble("all", genome, genome_size, "reads.fasta", "HiFi", threads, correction=False)
+hfref.flye_assemble("all", genome, genome_size, "reads.fasta", soft_paths_dict, "HiFi", threads, correction=False)
 hfrps.get_gfa_blastn_png(genome_absolute_path, soft_paths_dict)
 os.chdir("../../..")
