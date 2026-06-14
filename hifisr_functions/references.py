@@ -14,6 +14,7 @@ import numpy as np
 from collections import OrderedDict
 import sys
 import os
+import time
 
 # Function purity marker. "pure" means deterministic from explicit inputs with
 # no file, shell, environment, logging, or input-mutation side effects.
@@ -67,30 +68,163 @@ def get_rc(input_fa_path, rc_fa_path):
         print(rc_record.format("fasta"), file=fout)
 
 
+def _write_lines(path, lines):
+    with open(path, "wt") as fout:
+        for line in lines:
+            print(line, file=fout)
+
+
+def _sorted_interval(start, end):
+    left = min(int(start), int(end))
+    right = max(int(start), int(end))
+    return left, right
+
+
+def _is_full_self_hit(fields, ref_len):
+    q_start, q_end = _sorted_interval(fields[6], fields[7])
+    s_start, s_end = _sorted_interval(fields[8], fields[9])
+    aln_len = int(fields[3])
+    pident = float(fields[2])
+    return (
+        q_start == 1
+        and q_end == ref_len
+        and s_start == 1
+        and s_end == ref_len
+        and aln_len >= ref_len
+        and pident >= 99.999
+    )
+
+
+def _build_repeat_mask_from_blastn(blastn_lines, ref_len):
+    diff = np.zeros(ref_len + 1, dtype=int)
+    used_alignment_count = 0
+    skipped_full_self_count = 0
+    used_rows = []
+
+    for line in blastn_lines:
+        fields = line.split("\t")
+        if len(fields) < 12:
+            continue
+        if _is_full_self_hit(fields, ref_len):
+            skipped_full_self_count += 1
+            continue
+        q_start, q_end = _sorted_interval(fields[6], fields[7])
+        start = max(q_start - 1, 0)
+        end = min(q_end, ref_len)
+        if start >= end:
+            continue
+        diff[start] += 1
+        diff[end] -= 1
+        used_alignment_count += 1
+        used_rows.append(line)
+
+    repeat_mask = np.cumsum(diff[:-1])
+    stats = {
+        "used_alignment_count": used_alignment_count,
+        "skipped_full_self_count": skipped_full_self_count,
+    }
+    return repeat_mask, stats, used_rows
+
+
+def _intervals_from_mask(mask, want_repeat):
+    intervals = []
+    start = None
+    for index, value in enumerate(mask):
+        is_target = value > 0 if want_repeat else value == 0
+        if is_target and start is None:
+            start = index
+        elif not is_target and start is not None:
+            intervals.append((start, index - 1, index - start))
+            start = None
+    if start is not None:
+        intervals.append((start, len(mask) - 1, len(mask) - start))
+    return intervals
+
+
+def _circular_non_repeat_blocks(non_repeat_intervals, ref_len):
+    if not non_repeat_intervals:
+        return []
+    blocks = list(non_repeat_intervals)
+    if len(blocks) > 1 and blocks[0][0] == 0 and blocks[-1][1] == ref_len - 1:
+        first = blocks.pop(0)
+        last = blocks.pop(-1)
+        blocks.append((last[0], first[1], last[2] + first[2]))
+    blocks.sort(key=lambda item: item[2], reverse=True)
+    return blocks
+
+
+def _midpoint_on_circle(block, ref_len):
+    start, end, _length = block
+    if start <= end:
+        return (start + end) // 2
+    return ((start + end + ref_len) // 2) % ref_len
+
+
+def _write_bed(path, record_id, intervals, label):
+    with open(path, "wt") as fout:
+        for start, end, length in intervals:
+            print(record_id, start, end + 1, label, length, sep="\t", file=fout)
+
+
+def _write_reference_rotation_summary(path, summary):
+    keys = list(summary)
+    with open(path, "wt") as fout:
+        print("\t".join(keys), file=fout)
+        print("\t".join(str(summary[key]) for key in keys), file=fout)
+
+
 def rotate_ref_to_non_repeat_region(genome, genome_fasta_path, soft_paths_dict, rotation=False):
     ref_records = list(SeqIO.parse(genome_fasta_path, "fasta"))
     if len(ref_records) != 1:
         print("Error: fasta has more than one record.")
         return
+    ref_len = len(ref_records[0].seq)
     commands = soft_paths_dict.get("blastn") + " -query " + genome_fasta_path + " -subject " + genome_fasta_path + " -outfmt 6"
+    blastn_start = time.monotonic()
     blastn_lines = hfbase.get_cli_output_lines(commands, side_effect = False)
-    repeat_pos_array = np.zeros(len(ref_records[0].seq), dtype=int)
-    for line in blastn_lines[1:]: # skip the first line
-        fields = line.split("\t")
-        q_start = int(fields[6])
-        q_end = int(fields[7])
-        for i in range(q_start-1, q_end):
-            repeat_pos_array[i] += 1
+    blastn_seconds = time.monotonic() - blastn_start
+    _write_lines("blastn_self.tsv", blastn_lines)
+    repeat_pos_array, stats, used_rows = _build_repeat_mask_from_blastn(blastn_lines, ref_len)
+    _write_lines("blastn_self_used_for_repeat_mask.tsv", used_rows)
+    repeat_intervals = _intervals_from_mask(repeat_pos_array, want_repeat=True)
+    non_repeat_intervals = _intervals_from_mask(repeat_pos_array, want_repeat=False)
+    circular_blocks = _circular_non_repeat_blocks(non_repeat_intervals, ref_len)
+    _write_bed("repeat_regions.bed", ref_records[0].id, repeat_intervals, "repeat")
+    _write_bed("non_repeat_regions.linear.bed", ref_records[0].id, non_repeat_intervals, "non_repeat")
+    _write_bed("non_repeat_regions.circular_ranked.bed", ref_records[0].id, circular_blocks, "non_repeat_circular")
+
+    if not circular_blocks:
+        print("Error: no non-repeat region found.", file=sys.stderr)
+        return
+
+    non_start = circular_blocks[0][0]
+    non_end = circular_blocks[0][1]
+    length = circular_blocks[0][2]
+    rot_step = _midpoint_on_circle(circular_blocks[0], ref_len)
+    summary = {
+        "genome": genome,
+        "method": "blastn",
+        "blastn_options": "-outfmt 6",
+        "min_non_repeat_len": 5000,
+        "reference_length": ref_len,
+        "blastn_seconds": f"{blastn_seconds:.6f}",
+        "blastn_alignment_count": len(blastn_lines),
+        "used_alignment_count": stats["used_alignment_count"],
+        "skipped_full_self_count": stats["skipped_full_self_count"],
+        "repeat_covered_bp": int(np.count_nonzero(repeat_pos_array)),
+        "non_repeat_bp": int(ref_len - np.count_nonzero(repeat_pos_array)),
+        "repeat_region_count": len(repeat_intervals),
+        "non_repeat_region_count_linear": len(non_repeat_intervals),
+        "non_repeat_region_count_circular": len(circular_blocks),
+        "longest_non_repeat_start_0based": non_start,
+        "longest_non_repeat_end_0based": non_end,
+        "longest_non_repeat_length": length,
+        "rot_step": rot_step,
+        "rotated_fasta": genome + "_rotated_" + str(rot_step) + ".fasta" if length > 5000 else "",
+    }
+    _write_reference_rotation_summary("reference_rotation_summary.tsv", summary)
+
     if rotation:
-        non_repeat_region_info = []
-        while 0 in repeat_pos_array:
-            non_repeat_region_info, repeat_pos_array = find_continous_zeros(non_repeat_region_info, repeat_pos_array)
-            # find the largest non-repeat region
-        non_repeat_region_info.sort(key=lambda x: x[2], reverse=True)
-        non_start = non_repeat_region_info[0][0]
-        non_end = non_repeat_region_info[0][1]
-        length = non_repeat_region_info[0][2]
-        rot_step = (non_end + non_start) // 2
         if length > 5000:
             print("The largest non-repeat region is " + str(length) + " bp long.", file=sys.stderr)
             rotate_fasta(genome_fasta_path, genome + "_rotated_" + str(rot_step) + ".fasta", rot_step)
