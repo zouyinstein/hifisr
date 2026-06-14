@@ -157,7 +157,7 @@ def draft_dir(genome):
 
 
 def genome_reads(genome):
-    return str(reads_dir() / f"{SAMPLE}_{genome}.fastq")
+    return str(reads_dir() / f"{SAMPLE}_{genome}.fastq.gz")
 
 
 def sample_reads(genome):
@@ -298,7 +298,7 @@ rule references_ready:
 
 rule reads_ready:
     input:
-        expand(str(reads_dir() / "{sample}_{genome}.fastq"), sample=[SAMPLE], genome=GENOMES),
+        expand(str(reads_dir() / "{sample}_{genome}.fastq.gz"), sample=[SAMPLE], genome=GENOMES),
         expand(str(reads_dir() / "sample_reads" / "sample_4000_{genome}.fastq"), genome=GENOMES)
 
 
@@ -413,8 +413,8 @@ rule extract_mtpt_reads:
         mito_ref=lambda wc: ref_for_workflow("mito"),
         plastid_ref=lambda wc: ref_for_workflow("plastid")
     output:
-        mito_fastq=str(reads_dir() / f"{SAMPLE}_mito.fastq"),
-        plastid_fastq=str(reads_dir() / f"{SAMPLE}_plastid.fastq"),
+        mito_fastq=str(reads_dir() / f"{SAMPLE}_mito.fastq.gz"),
+        plastid_fastq=str(reads_dir() / f"{SAMPLE}_plastid.fastq.gz"),
         mito_stats=str(reads_dir() / "mito_id_length_qual.txt"),
         plastid_stats=str(reads_dir() / "plastid_id_length_qual.txt")
     threads: THREADS_READS

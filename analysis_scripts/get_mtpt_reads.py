@@ -70,4 +70,8 @@ hfrps.plot_length_qual("mito", "HiFi", id_length_qual_file, total_read_number, t
 id_length_qual_file, total_read_number, total_bases = hfrps.get_fastq_stats("plastid", sample_index + "_plastid.fastq", soft_paths_dict, threads)
 hfrps.plot_length_qual("plastid", "HiFi", id_length_qual_file, total_read_number, total_bases)
 
+pigz = soft_paths_dict.get("pigz", "pigz")
+command_1 = pigz + " -p " + threads + " -f " + sample_index + "_mito.fastq " + sample_index + "_plastid.fastq"
+hfbase.get_cli_output_lines(command_1, side_effect = True)
+
 os.chdir("../..")

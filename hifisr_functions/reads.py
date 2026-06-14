@@ -43,7 +43,7 @@ def split_mtpt_reads(sample_index, sample_fastq_path, sample_platform, mito_fa, 
     command_6 = soft_paths_dict.get("samtools") + " sort -@ " + threads + " - -o reads.sorted.bam"
     command_7 = soft_paths_dict.get("samtools") + " index reads.sorted.bam"
     command_8 = soft_paths_dict.get("bamtools") + " split -in reads.sorted.bam -reference"
-    command_9 = "rm -rf mito.fastq plastid.fastq"
+    command_9 = "rm -rf " + sample_index + "_mito.fastq " + sample_index + "_plastid.fastq " + sample_index + "_mito.fastq.gz " + sample_index + "_plastid.fastq.gz"
     command_10 = "cat mito_ids.txt | while read ID; do " + soft_paths_dict.get("samtools") + " fastq reads.sorted.REF_${ID}.bam -@ " + threads + " >> " + sample_index + "_mito.fastq; done"
     command_11 = "cat plastid_ids.txt | while read ID; do " + soft_paths_dict.get("samtools") + " fastq reads.sorted.REF_${ID}.bam -@ " + threads + " >> " + sample_index + "_plastid.fastq; done"
     command_12 = "rm -rf mito_ids.txt plastid_ids.txt mtpt.fa reads.sorted.bam reads.sorted.bam.bai reads.sorted.*.bam" 
