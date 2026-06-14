@@ -53,7 +53,8 @@ os.chdir(run_info)
 current_dir = os.getcwd()
 
 # run multi-threading blastn, and get all_sorted_blastn_alignments.txt
-hfvar.run_multi_threads_blastn(sample_index, genome, run_info, reads_absolute_path, genome_absolute_path, "all_sorted_blastn_alignments.txt", soft_paths_dict, threads)
+# hfvar.run_multi_threads_blastn(sample_index, genome, run_info, reads_absolute_path, genome_absolute_path, "all_sorted_blastn_alignments.txt", soft_paths_dict, threads)
+hfvar.run_multi_threads_minimap2(sample_index, genome, run_info, reads_absolute_path, genome_absolute_path, "all_sorted_blastn_alignments.txt", soft_paths_dict, threads)
 hfvar.summarize_blastn_results("all_sorted_blastn_alignments.txt")
 
 # plot type_2_rep

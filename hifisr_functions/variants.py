@@ -14,10 +14,13 @@ import pandas as pd
 import polars as pl
 from collections import OrderedDict
 import concurrent.futures as cf
+import itertools
 import math
+import subprocess
 import sys
 import os
 import tempfile
+import time
 
 # Function purity marker. "pure" means deterministic from explicit inputs with
 # no file, shell, environment, logging, or input-mutation side effects.
@@ -26,6 +29,8 @@ FUNCTION_PURITY = {
     "Index_label_alignments": "impure",
     "run_blastn_sorter_single": "impure",
     "run_multi_threads_blastn": "impure",
+    "run_minimap2_sorter_single": "impure",
+    "run_multi_threads_minimap2": "impure",
     "get_type_and_subtype": "impure",
     "check_FL_and_multi": "impure",
     "get_next_groups": "pure",
@@ -188,6 +193,574 @@ def run_multi_threads_blastn(sample_index, genome, run_info, reads_filename, gen
         futures = [tex.submit(run_blastn_sorter_single, read_record, genome_absolute_path, results_filename, soft_paths_dict, tmp_blastn_dir) for read_record in read_records]
         results = [future.result() for future in cf.as_completed(futures)]
     command_1 = "mv " + tmp_blastn_dir + "/" + results_filename + " ."
+    command_2 = "rm -rf " + os.path.join(tmp_root, sample_index)
+    commands = command_1 + ";" + command_2
+    hfbase.get_cli_output_lines(commands, side_effect = True)
+
+
+DEFAULT_MINIMAP2_OPTIONS = [
+    "-x",
+    "map-hifi",
+    "-c",
+    "-k",
+    "11",
+    "-w",
+    "7",
+    "--secondary=yes",
+    "-N",
+    "200",
+    "-p",
+    "0.01",
+]
+
+
+TERMINAL_EXTENSION_WINDOW = 8
+TERMINAL_EXTENSION_MAX_GAP = 2
+TERMINAL_EXTENSION_MIN_ALIGNMENT_LENGTH = 500
+
+
+WHOLE_READ_EVIDENCE_HEADER = [
+    "read_id",
+    "read_length",
+    "query_start",
+    "query_end",
+    "target_id",
+    "target_start",
+    "target_end",
+    "strand",
+    "identity",
+    "mapq",
+    "alignment_role",
+    "cigar",
+    "crosses_junction",
+    "junction_id",
+    "crosses_repeat_choice",
+    "repeat_choice_id",
+    "source_compat_file",
+]
+
+
+MINIMAP2_RUNTIME_HEADER = [
+    "read_id",
+    "minimap2_seconds",
+    "terminal_extension_seconds",
+    "paf_lines",
+    "adjusted_paf_lines",
+    "blastn_compatible_lines",
+]
+
+
+def _paf_tags(fields):
+    tags = {}
+    for field in fields[12:]:
+        tag_fields = field.split(":", 2)
+        if len(tag_fields) == 3:
+            tags[tag_fields[0]] = tag_fields[2]
+    return tags
+
+
+def _minimap2_paf_to_blastn_outfmt6(paf_lines):
+    blastn_like_lines = []
+    for line in paf_lines:
+        fields = line.split("\t")
+        if len(fields) < 12:
+            continue
+        q_id = fields[0]
+        q_start = int(fields[2])
+        q_end = int(fields[3])
+        strand = fields[4]
+        s_id = fields[5]
+        s_start = int(fields[7])
+        s_end = int(fields[8])
+        matches = int(fields[9])
+        block_len = max(int(fields[10]), 1)
+
+        pident = matches / block_len * 100
+        aln_len = max(q_end - q_start, 1)
+        mismatches = max(block_len - matches, 0)
+        q_start_1 = q_start + 1
+        q_end_1 = q_end
+        if strand == "-":
+            s_start_1 = s_end
+            s_end_1 = s_start + 1
+        else:
+            s_start_1 = s_start + 1
+            s_end_1 = s_end
+
+        blastn_like_lines.append(
+            "\t".join(
+                [
+                    q_id,
+                    s_id,
+                    f"{pident:.3f}",
+                    str(aln_len),
+                    str(mismatches),
+                    "0",
+                    str(q_start_1),
+                    str(q_end_1),
+                    str(s_start_1),
+                    str(s_end_1),
+                    "0.0",
+                    str(matches),
+                ]
+            )
+        )
+    return blastn_like_lines
+
+
+_COMPLEMENT_TABLE = str.maketrans("ACGTNacgtn", "TGCANtgcan")
+
+
+def _reverse_complement(sequence):
+    return sequence.translate(_COMPLEMENT_TABLE)[::-1].upper()
+
+
+def _can_match_after_skipping(sequence_a, sequence_b, max_skips):
+    if abs(len(sequence_a) - len(sequence_b)) > max_skips:
+        return False
+    if set(sequence_a + sequence_b) - set("ACGT"):
+        return False
+    if len(sequence_a) == len(sequence_b):
+        return sequence_a == sequence_b
+
+    if len(sequence_a) > len(sequence_b):
+        skip_count = len(sequence_a) - len(sequence_b)
+        for skip_indexes in itertools.combinations(range(len(sequence_a)), skip_count):
+            skip_set = set(skip_indexes)
+            trimmed = "".join(
+                base for index, base in enumerate(sequence_a) if index not in skip_set
+            )
+            if trimmed == sequence_b:
+                return True
+        return False
+
+    skip_count = len(sequence_b) - len(sequence_a)
+    for skip_indexes in itertools.combinations(range(len(sequence_b)), skip_count):
+        skip_set = set(skip_indexes)
+        trimmed = "".join(
+            base for index, base in enumerate(sequence_b) if index not in skip_set
+        )
+        if sequence_a == trimmed:
+            return True
+    return False
+
+
+def _best_terminal_microindel_extension(query_seq, target_seq):
+    query_seq = query_seq[:TERMINAL_EXTENSION_WINDOW].upper()
+    target_seq = target_seq[:TERMINAL_EXTENSION_WINDOW].upper()
+    best_query_len = 0
+    best_target_len = 0
+    best_key = (-1, -1, -1)
+    for query_len in range(3, len(query_seq) + 1):
+        for target_len in range(3, len(target_seq) + 1):
+            gap_len = abs(query_len - target_len)
+            if gap_len == 0 or gap_len > TERMINAL_EXTENSION_MAX_GAP:
+                continue
+            if not _can_match_after_skipping(
+                query_seq[:query_len],
+                target_seq[:target_len],
+                TERMINAL_EXTENSION_MAX_GAP,
+            ):
+                continue
+            matches = min(query_len, target_len)
+            key = (matches, -(query_len + target_len), -gap_len)
+            if key > best_key:
+                best_key = key
+                best_query_len = query_len
+                best_target_len = target_len
+    return best_query_len, best_target_len, min(best_query_len, best_target_len)
+
+
+def _extend_paf_terminal_microindels(paf_lines, read_sequence, ref_seq_by_id):
+    read_sequence = str(read_sequence).upper()
+    adjusted_lines = []
+    for line in paf_lines:
+        fields = line.split("\t")
+        if len(fields) < 12:
+            adjusted_lines.append(line)
+            continue
+        target_sequence = ref_seq_by_id.get(fields[5])
+        if target_sequence is None:
+            adjusted_lines.append(line)
+            continue
+
+        query_start = int(fields[2])
+        query_end = int(fields[3])
+        strand = fields[4]
+        target_start = int(fields[7])
+        target_end = int(fields[8])
+        matches = int(fields[9])
+        block_len = int(fields[10])
+
+        if query_end - query_start < TERMINAL_EXTENSION_MIN_ALIGNMENT_LENGTH:
+            adjusted_lines.append(line)
+            continue
+
+        window = TERMINAL_EXTENSION_WINDOW
+        query_right = read_sequence[query_end:query_end + window]
+        query_left = read_sequence[max(0, query_start - window):query_start][::-1]
+        if strand == "+":
+            target_right = target_sequence[target_end:target_end + window]
+            target_left = target_sequence[max(0, target_start - window):target_start][::-1]
+        else:
+            target_right = _reverse_complement(
+                target_sequence[max(0, target_start - window):target_start]
+            )
+            target_left = _reverse_complement(
+                target_sequence[target_end:target_end + window]
+            )[::-1]
+
+        right_query, right_target, right_matches = _best_terminal_microindel_extension(
+            query_right,
+            target_right,
+        )
+        left_query, left_target, left_matches = _best_terminal_microindel_extension(
+            query_left,
+            target_left,
+        )
+
+        query_start -= left_query
+        query_end += right_query
+        if strand == "+":
+            target_start -= left_target
+            target_end += right_target
+        else:
+            target_start -= right_target
+            target_end += left_target
+        matches += left_matches + right_matches
+        block_len += max(left_query, left_target) + max(right_query, right_target)
+
+        fields[2] = str(query_start)
+        fields[3] = str(query_end)
+        fields[7] = str(target_start)
+        fields[8] = str(target_end)
+        fields[9] = str(matches)
+        fields[10] = str(max(block_len, 1))
+        adjusted_lines.append("\t".join(fields))
+    return adjusted_lines
+
+
+def _paf_to_whole_read_evidence(paf_lines, read_id, read_length, source_compat_file):
+    rows = []
+    for line in paf_lines:
+        fields = line.split("\t")
+        if len(fields) < 12:
+            continue
+        tags = _paf_tags(fields)
+        matches = int(fields[9])
+        block_len = max(int(fields[10]), 1)
+        role = {"P": "primary", "S": "secondary", "I": "inversion", "i": "inversion"}.get(
+            tags.get("tp", "."),
+            tags.get("tp", "."),
+        )
+        rows.append(
+            [
+                fields[0],
+                fields[1],
+                str(int(fields[2]) + 1),
+                fields[3],
+                fields[5],
+                str(int(fields[7]) + 1),
+                fields[8],
+                fields[4],
+                f"{matches / block_len * 100:.3f}",
+                fields[11],
+                role,
+                tags.get("cg", "."),
+                "not_evaluated",
+                ".",
+                "not_evaluated",
+                ".",
+                source_compat_file,
+            ]
+        )
+    if rows:
+        return rows
+    return [
+        [
+            read_id,
+            str(read_length),
+            ".",
+            ".",
+            ".",
+            ".",
+            ".",
+            ".",
+            ".",
+            ".",
+            "no_alignment",
+            ".",
+            "not_evaluated",
+            ".",
+            "not_evaluated",
+            ".",
+            source_compat_file,
+        ]
+    ]
+
+
+def _run_minimap2_with_options(read_fasta, ref_fasta, soft_paths_dict, options):
+    minimap2 = soft_paths_dict.get("minimap2", "minimap2")
+    command = [
+        minimap2,
+        "-t",
+        "1",
+    ] + options + [
+        ref_fasta,
+        read_fasta,
+    ]
+    completed = subprocess.run(command, capture_output=True, text=True)
+    if completed.returncode != 0:
+        raise RuntimeError(
+            "minimap2 failed with exit code "
+            + str(completed.returncode)
+            + ": "
+            + " ".join(command)
+            + "\n"
+            + completed.stderr
+        )
+    return [line for line in completed.stdout.splitlines() if line.strip()]
+
+
+def _run_minimap2(read_fasta, ref_fasta, soft_paths_dict):
+    return _run_minimap2_with_options(
+        read_fasta,
+        ref_fasta,
+        soft_paths_dict,
+        DEFAULT_MINIMAP2_OPTIONS,
+    )
+
+
+def _format_sorted_alignment_summary(blastn_alignments_lines, q_len):
+    query_ref_index_label_alignments = Index_label_alignments(blastn_alignments_lines)
+    count = 1
+    while count > 0:
+        count = query_ref_index_label_alignments.pop_contained_alignments()
+    one_alignments = query_ref_index_label_alignments.get_sorted_one_alignments()
+    if len(one_alignments) == 0:
+        return ""
+
+    q_id = one_alignments[0][2].split(";")[0]
+    s_id = one_alignments[0][2].split(";")[1]
+    num_align = len(one_alignments)
+    strand_list = [ "+" for i in range(num_align) ]
+    percent_ident_list = [ 100 for i in range(num_align) ]
+    qs_list = [1] * num_align
+    qe_list = [1] * num_align
+    ss_list = [1] * num_align
+    se_list = [1] * num_align
+    part_len_list = [1] * num_align
+    AO_len_list = [1] * num_align
+    copy_info_list = [""] * num_align
+    for i in range(num_align):
+        align_info_fields = one_alignments[i][2].split(";")
+        percent_ident_list[i] = float(align_info_fields[2])
+        qs_list[i] = int(align_info_fields[6])
+        qe_list[i] = int(align_info_fields[7])
+        ss_list[i] = int(align_info_fields[8])
+        se_list[i] = int(align_info_fields[9])
+        part_len_list[i] = qe_list[i] - qs_list[i] + 1
+        if ss_list[i] > se_list[i]:
+            strand_list[i] = "-"
+    for i in range(num_align):
+        if (i+1) != num_align:
+            AO_len_list[i] = qe_list[i] - qs_list[i+1] + 1
+        else:
+            AO_len_list[i] = "NA"
+    percent_total = float((sum(part_len_list) - sum(AO_len_list[:-1])) / q_len * 100)
+    aln_type = "aln_type=" + str(num_align) + ";"
+    for i in range(num_align):
+        if AO_len_list[i] == "NA":
+            olp_type = "NA"
+        elif type(AO_len_list[i]) == int:
+            if AO_len_list[i] == 0:
+                olp_type = "ref"
+            elif AO_len_list[i] > 0:
+                olp_type = "rep"
+            elif AO_len_list[i] < 0:
+                olp_type = "ins"
+        if i != (num_align - 1):
+            aln_type += olp_type + ","
+        else:
+            aln_type += olp_type
+    to_print_1 = "\t".join([q_id, s_id, str(q_len), aln_type, str(percent_total)])
+    to_print_2 = ""
+    for i in range(num_align):
+        copy_info_list[i] = "cn=1;c1=100.0,1,1"
+        to_print_2 += "\taln=" + str(i+1) + ";len=" + str(part_len_list[i]) + ";olp=" + str(AO_len_list[i]) + ";idt=" + str(percent_ident_list[i]) + ";strand=" + strand_list[i] + ";qs=" + str(qs_list[i]) + ";qe=" + str(qe_list[i]) + ";ss=" + str(ss_list[i]) + ";se=" + str(se_list[i]) + ";" + copy_info_list[i]
+    return to_print_1 + to_print_2
+
+
+def _write_tsv(path, rows):
+    with open(path, "wt") as fout:
+        for row in rows:
+            print("\t".join(row), file=fout)
+
+
+def run_minimap2_sorter_single(read_record, ref_fasta, results_filename, soft_paths_dict, tmp_blastn_dir):
+    read_fasta = os.path.join(tmp_blastn_dir, read_record.id + ".fasta")
+    sorted_alignments_file = os.path.join(tmp_blastn_dir, read_record.id + "_sorted_blastn_alignments.txt")
+    evidence_file = os.path.join(tmp_blastn_dir, read_record.id + "_whole_read_evidence.tsv")
+    runtime_file = os.path.join(tmp_blastn_dir, read_record.id + "_minimap2_runtime.tsv")
+    with open(read_fasta, "wt") as fout:
+        print(read_record.format("fasta"), file=fout)
+    q_len = len(read_record.seq)
+    ref_records = list(SeqIO.parse(ref_fasta, "fasta"))
+    if len(ref_records) > 1:
+        print("Warning: multiple records in reference file", file=sys.stderr)
+
+    minimap2_start = time.monotonic()
+    paf_lines = _run_minimap2(read_fasta, ref_fasta, soft_paths_dict)
+    minimap2_seconds = time.monotonic() - minimap2_start
+    ref_seq_by_id = {record.id: str(record.seq).upper() for record in ref_records}
+    extension_start = time.monotonic()
+    adjusted_paf_lines = _extend_paf_terminal_microindels(
+        paf_lines,
+        read_record.seq,
+        ref_seq_by_id,
+    )
+    terminal_extension_seconds = time.monotonic() - extension_start
+    blastn_alignments_lines = _minimap2_paf_to_blastn_outfmt6(adjusted_paf_lines)
+    evidence_rows = _paf_to_whole_read_evidence(
+        paf_lines,
+        read_record.id,
+        q_len,
+        results_filename,
+    )
+    _write_tsv(evidence_file, evidence_rows)
+    _write_tsv(
+        runtime_file,
+        [
+            [
+                read_record.id,
+                f"{minimap2_seconds:.6f}",
+                f"{terminal_extension_seconds:.6f}",
+                str(len(paf_lines)),
+                str(len(adjusted_paf_lines)),
+                str(len(blastn_alignments_lines)),
+            ]
+        ],
+    )
+
+    if len(blastn_alignments_lines) == 0:
+        with open("reads_with_no_alignments.txt", "at") as fout:
+            print(read_record.id, file=fout)
+        open(sorted_alignments_file, "wt").close()
+    else:
+        sorted_summary = _format_sorted_alignment_summary(blastn_alignments_lines, q_len)
+        with open(sorted_alignments_file, "wt") as fout:
+            if sorted_summary:
+                print(sorted_summary, file=fout)
+
+    os.remove(read_fasta)
+
+
+def run_multi_threads_minimap2(sample_index, genome, run_info, reads_filename, genome_absolute_path, results_filename, soft_paths_dict, threads):
+    if "/" in results_filename:
+        print("Error: results_filename contains '/'", file=sys.stderr)
+        sys.exit(1)
+    tmp_root = get_tmp_root()
+    tmp_blastn_dir = os.path.join(tmp_root, sample_index, genome, run_info, "tmp_blastn_results")
+    if not os.path.exists(tmp_blastn_dir):
+        os.makedirs(tmp_blastn_dir)
+    backup_info_dir = "backup_info"
+    if not os.path.exists(backup_info_dir):
+        os.makedirs(backup_info_dir)
+    if os.path.exists(os.path.join(tmp_blastn_dir, results_filename)):
+        os.remove(os.path.join(tmp_blastn_dir, results_filename))
+
+    command_1 = soft_paths_dict.get("seqkit") + " fq2fa " + reads_filename + " > reads.fasta"
+    hfbase.get_cli_output_lines(command_1, side_effect = True)
+    hfreads.replace_reads_id("reads.fasta", "new_reads.fasta")
+    read_records = list(SeqIO.parse("new_reads.fasta", "fasta"))
+    if os.path.exists(results_filename):
+        os.remove(results_filename)
+    for sidecar_file in [
+        "whole_read_evidence.tsv",
+        "minimap2_runtime.tsv",
+        "minimap2_runtime_summary.tsv",
+    ]:
+        if os.path.exists(sidecar_file):
+            os.remove(sidecar_file)
+        backup_sidecar_file = os.path.join(backup_info_dir, sidecar_file)
+        if os.path.exists(backup_sidecar_file):
+            os.remove(backup_sidecar_file)
+
+    wall_start = time.monotonic()
+    with cf.ThreadPoolExecutor(int(threads)) as tex:
+        futures = [
+            tex.submit(
+                run_minimap2_sorter_single,
+                read_record,
+                genome_absolute_path,
+                results_filename,
+                soft_paths_dict,
+                tmp_blastn_dir,
+            )
+            for read_record in read_records
+        ]
+        results = [future.result() for future in cf.as_completed(futures)]
+    wall_seconds = time.monotonic() - wall_start
+
+    tmp_results_file = os.path.join(tmp_blastn_dir, results_filename)
+    with open(tmp_results_file, "wt") as fout:
+        for read_record in read_records:
+            sorted_alignments_file = os.path.join(
+                tmp_blastn_dir,
+                read_record.id + "_sorted_blastn_alignments.txt",
+            )
+            if os.path.exists(sorted_alignments_file):
+                with open(sorted_alignments_file) as fin:
+                    fout.write(fin.read())
+
+    with open(os.path.join(backup_info_dir, "whole_read_evidence.tsv"), "wt") as fout:
+        print("\t".join(WHOLE_READ_EVIDENCE_HEADER), file=fout)
+        for read_record in read_records:
+            evidence_file = os.path.join(
+                tmp_blastn_dir,
+                read_record.id + "_whole_read_evidence.tsv",
+            )
+            if os.path.exists(evidence_file):
+                with open(evidence_file) as fin:
+                    fout.write(fin.read())
+
+    total_minimap2_seconds = 0.0
+    total_extension_seconds = 0.0
+    runtime_rows = 0
+    with open(os.path.join(backup_info_dir, "minimap2_runtime.tsv"), "wt") as fout:
+        print("\t".join(MINIMAP2_RUNTIME_HEADER), file=fout)
+        for read_record in read_records:
+            runtime_file = os.path.join(
+                tmp_blastn_dir,
+                read_record.id + "_minimap2_runtime.tsv",
+            )
+            if os.path.exists(runtime_file):
+                with open(runtime_file) as fin:
+                    for line in fin:
+                        fout.write(line)
+                        fields = line.rstrip("\n").split("\t")
+                        total_minimap2_seconds += float(fields[1])
+                        total_extension_seconds += float(fields[2])
+                        runtime_rows += 1
+
+    with open(os.path.join(backup_info_dir, "minimap2_runtime_summary.tsv"), "wt") as fout:
+        print("metric", "value", sep="\t", file=fout)
+        print("read_count", runtime_rows, sep="\t", file=fout)
+        print("worker_wall_seconds", f"{wall_seconds:.6f}", sep="\t", file=fout)
+        print("sum_minimap2_seconds", f"{total_minimap2_seconds:.6f}", sep="\t", file=fout)
+        print("sum_terminal_extension_seconds", f"{total_extension_seconds:.6f}", sep="\t", file=fout)
+        print("threads", threads, sep="\t", file=fout)
+        print("minimap2_options", " ".join(DEFAULT_MINIMAP2_OPTIONS), sep="\t", file=fout)
+        print("terminal_extension_window", TERMINAL_EXTENSION_WINDOW, sep="\t", file=fout)
+        print("terminal_extension_max_gap", TERMINAL_EXTENSION_MAX_GAP, sep="\t", file=fout)
+        print(
+            "terminal_extension_min_alignment_length",
+            TERMINAL_EXTENSION_MIN_ALIGNMENT_LENGTH,
+            sep="\t",
+            file=fout,
+        )
+
+    command_1 = "mv " + tmp_results_file + " ."
     command_2 = "rm -rf " + os.path.join(tmp_root, sample_index)
     commands = command_1 + ";" + command_2
     hfbase.get_cli_output_lines(commands, side_effect = True)

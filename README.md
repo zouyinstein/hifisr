@@ -15,6 +15,8 @@ The Snakemake workflow runs directly from this source checkout; installing the
 
 Function usage notes and pure/impure markers for `hifisr_functions/` are in
 [docs/hifisr_functions_reference.md](docs/hifisr_functions_reference.md).
+The staged module split is documented in
+[docs/hifisr_functions_architecture.md](docs/hifisr_functions_architecture.md).
 
 ## Dependency Coverage
 

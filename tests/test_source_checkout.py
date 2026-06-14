@@ -175,3 +175,76 @@ def test_hifisr_functions_have_purity_metadata():
             public_defs.update(getattr(module, "__all__", []))
 
         assert set(purity) == public_defs, f"{path.name} purity metadata is incomplete"
+
+
+def test_new_architecture_imports_keep_legacy_modules_available():
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
+
+    architecture_modules = [
+        "hifisr_functions.cli.main",
+        "hifisr_functions.core.config",
+        "hifisr_functions.core.io",
+        "hifisr_functions.core.runner",
+        "hifisr_functions.graph.coordinate",
+        "hifisr_functions.graph.evidence_projection",
+        "hifisr_functions.graph.gfa",
+        "hifisr_functions.graph.path",
+        "hifisr_functions.read_ops.binning",
+        "hifisr_functions.read_ops.recruit",
+        "hifisr_functions.read_ops.stats",
+        "hifisr_functions.report.html",
+        "hifisr_functions.report.plots",
+        "hifisr_functions.report.tables",
+        "hifisr_functions.validation.confidence",
+        "hifisr_functions.validation.flag",
+        "hifisr_functions.validation.model_selection",
+        "hifisr_functions.validation.numt_nupt",
+        "hifisr_functions.variant_ops.frequency",
+        "hifisr_functions.variant_ops.junction",
+        "hifisr_functions.variant_ops.read_linkage",
+        "hifisr_functions.variant_ops.snv_indel",
+        "hifisr_functions.variant_ops.sv",
+        "hifisr_functions.workflow.checkpoints",
+        "hifisr_functions.workflow.init",
+        "hifisr_functions.workflow.recipes",
+    ]
+    for module_name in architecture_modules:
+        importlib.import_module(module_name)
+
+    import hifisr_functions.base as hfbase
+    import hifisr_functions.reads as hfreads
+    import hifisr_functions.references as hfref
+    import hifisr_functions.reports as hfrps
+    import hifisr_functions.transfer as hftrans
+    import hifisr_functions.variants as hfvar
+
+    from hifisr_functions.core import config, io, runner
+    from hifisr_functions.graph import coordinate, evidence_projection, gfa, path
+    from hifisr_functions.read_ops import binning, recruit, stats
+    from hifisr_functions.report import plots, tables
+    from hifisr_functions.validation import numt_nupt
+    from hifisr_functions.variant_ops import junction, snv_indel, sv
+    from hifisr_functions.workflow import checkpoints, recipes
+
+    assert Path(hfreads.__file__).name == "reads.py"
+    assert Path(hfvar.__file__).name == "variants.py"
+
+    assert config.load_soft_paths is hfbase.load_soft_paths
+    assert io.get_file_lines is hfbase.get_file_lines
+    assert runner.run_checked is hfbase.run_checked
+    assert coordinate.get_subseq is hfref.get_subseq
+    assert evidence_projection.aln_to_ref is hfref.aln_to_ref
+    assert gfa.get_gfa_blastn_png is hfrps.get_gfa_blastn_png
+    assert path.rotate_ref_to_non_repeat_region is hfref.rotate_ref_to_non_repeat_region
+    assert binning.random_sampling is hfreads.random_sampling
+    assert recruit.split_mtpt_reads is hfreads.split_mtpt_reads
+    assert stats.get_fastq_stats is hfrps.get_fastq_stats
+    assert plots.plot_coverage is hfrps.plot_coverage
+    assert tables.convert_blastn_alignments_to_table is hfrps.convert_blastn_alignments_to_table
+    assert numt_nupt.run_transfer_blastn is hftrans.run_transfer_blastn
+    assert junction.get_next_groups is hfvar.get_next_groups
+    assert snv_indel.snv_or_indel is hfvar.snv_or_indel
+    assert sv.run_multi_threads_blastn is hfvar.run_multi_threads_blastn
+    assert checkpoints.validate_soft_paths is hfbase.validate_soft_paths
+    assert recipes.flye_assemble is hfref.flye_assemble
