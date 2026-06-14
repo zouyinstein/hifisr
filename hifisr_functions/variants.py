@@ -12,6 +12,7 @@ import hifisr_functions.reads as hfreads
 from Bio import SeqIO
 import pandas as pd
 import polars as pl
+import pysam
 from collections import OrderedDict
 import concurrent.futures as cf
 import itertools
@@ -42,6 +43,8 @@ FUNCTION_PURITY = {
     "summarize_blastn_results": "impure",
     "get_cov_reads": "impure",
     "run_bcftools": "impure",
+    "run_bcftools_from_bam": "impure",
+    "run_multi_threads_bcftools_legacy": "impure",
     "run_multi_threads_bcftools": "impure",
     "snv_or_indel": "impure",
 }
@@ -247,6 +250,17 @@ MINIMAP2_RUNTIME_HEADER = [
     "paf_lines",
     "adjusted_paf_lines",
     "blastn_compatible_lines",
+]
+
+
+BCFTOOLS_RUNTIME_HEADER = [
+    "read_id",
+    "minimap2_seconds",
+    "samtools_seconds",
+    "bcftools_seconds",
+    "calls_count",
+    "exit_status",
+    "message",
 ]
 
 
@@ -1511,7 +1525,142 @@ def run_bcftools(read_record, ref_fasta, sample_platform, soft_paths_dict, tmp_b
     return
 
 
-def run_multi_threads_bcftools(sample_index, genome, run_info, reads_filename, genome_absolute_path, sample_platform, results_filename, soft_paths_dict, threads):
+def _platform_to_minimap2_preset(sample_platform):
+    platform_dict = {
+            "HiFi": "map-hifi",
+            "CLR": "map-pb",
+            "ONT": "map-ont",
+            "ultra-long": "map-ont",
+        }
+    return platform_dict.get(sample_platform)
+
+
+def _run_shell_pipe_checked(command):
+    return subprocess.run(
+        ["/bin/bash", "-o", "pipefail", "-c", command],
+        capture_output=True,
+        text=True,
+    )
+
+
+def _write_name_sorted_variant_bam(reads_filename, genome_absolute_path, sample_platform, soft_paths_dict, threads, output_bam):
+    preset = _platform_to_minimap2_preset(sample_platform)
+    if preset is None:
+        raise ValueError("Unsupported sample platform: " + str(sample_platform))
+    minimap2 = soft_paths_dict.get("minimap2")
+    samtools = soft_paths_dict.get("samtools")
+    command = (
+        minimap2 + " -t " + str(threads) + " -ax " + preset + " "
+        + genome_absolute_path + " " + reads_filename
+        + " | " + samtools + " view -Sb -F 0x100 -@ " + str(threads) + " -"
+        + " | " + samtools + " sort -n -@ " + str(threads) + " -o " + output_bam + " -"
+    )
+    start_time = time.monotonic()
+    completed = _run_shell_pipe_checked(command)
+    seconds = time.monotonic() - start_time
+    if completed.returncode != 0:
+        raise RuntimeError(
+            "Shared minimap2/samtools alignment failed with exit code "
+            + str(completed.returncode)
+            + "\n"
+            + completed.stderr
+        )
+    return seconds, command, completed.stderr
+
+
+def _split_name_sorted_bam_by_read(name_sorted_bam, read_ids, tmp_bcftools_dir):
+    read_index = {read_id: i for i, read_id in enumerate(read_ids)}
+    read_bam_paths = {}
+    seen_read_ids = set()
+
+    def flush_records(bam_template, read_id, records):
+        if read_id not in read_index:
+            return
+        records.sort(
+            key=lambda record: (
+                record.reference_id if record.reference_id >= 0 else 10**12,
+                record.reference_start if record.reference_start >= 0 else 10**12,
+                record.flag,
+            )
+        )
+        read_bam = os.path.join(tmp_bcftools_dir, "read_" + str(read_index[read_id]) + ".bam")
+        with pysam.AlignmentFile(read_bam, "wb", template=bam_template) as fout:
+            for record in records:
+                fout.write(record)
+        read_bam_paths[read_id] = read_bam
+        seen_read_ids.add(read_id)
+
+    start_time = time.monotonic()
+    with pysam.AlignmentFile(name_sorted_bam, "rb") as bam:
+        current_read_id = None
+        current_records = []
+        for record in bam:
+            read_id = record.query_name
+            if current_read_id is None:
+                current_read_id = read_id
+            if read_id != current_read_id:
+                flush_records(bam, current_read_id, current_records)
+                current_read_id = read_id
+                current_records = []
+            current_records.append(record)
+        if current_read_id is not None:
+            flush_records(bam, current_read_id, current_records)
+    split_seconds = time.monotonic() - start_time
+    return read_bam_paths, seen_read_ids, split_seconds
+
+
+def run_bcftools_from_bam(read_id, read_bam, ref_fasta, soft_paths_dict, output_file):
+    bcftools = soft_paths_dict.get("bcftools")
+    if read_bam is None:
+        open(output_file, "wt").close()
+        return {
+            "read_id": read_id,
+            "minimap2_seconds": 0.0,
+            "samtools_seconds": 0.0,
+            "bcftools_seconds": 0.0,
+            "calls_count": 0,
+            "exit_status": 0,
+            "message": "no_alignment",
+            "stderr": "",
+        }
+    command = (
+        bcftools + " mpileup --indels-2.0 -m 1 -Ou -f " + ref_fasta + " " + read_bam
+        + " | " + bcftools + " call -mv -P 0.99 -Ov"
+    )
+    start_time = time.monotonic()
+    completed = _run_shell_pipe_checked(command)
+    bcftools_seconds = time.monotonic() - start_time
+    calls = []
+    message = "ok"
+    if completed.returncode == 0:
+        for line in completed.stdout.splitlines():
+            if not line or line.startswith("#"):
+                continue
+            fields = line.split("\t")
+            if len(fields) >= 5:
+                calls.append([read_id, fields[1], fields[3], fields[4]])
+    else:
+        message = "bcftools_failed"
+    with open(output_file, "wt") as fout:
+        for call in calls:
+            print("\t".join(call), file=fout)
+    try:
+        os.remove(read_bam)
+    except OSError:
+        pass
+    return {
+        "read_id": read_id,
+        "minimap2_seconds": 0.0,
+        "samtools_seconds": 0.0,
+        "bcftools_seconds": bcftools_seconds,
+        "calls_count": len(calls),
+        "exit_status": completed.returncode,
+        "message": message,
+        "stderr": completed.stderr,
+    }
+
+
+def run_multi_threads_bcftools_legacy(sample_index, genome, run_info, reads_filename, genome_absolute_path, sample_platform, results_filename, soft_paths_dict, threads):
     if "/" in results_filename:
         print("Error: results_filename contains '/'", file=sys.stderr)
         sys.exit(1)
@@ -1532,6 +1681,144 @@ def run_multi_threads_bcftools(sample_index, genome, run_info, reads_filename, g
     command_2 = "rm -rf " + os.path.join(tmp_root, sample_index)
     commands = command_1 + ";" + command_2
     hfbase.get_cli_output_lines(commands, side_effect = True)
+
+
+def run_multi_threads_bcftools(sample_index, genome, run_info, reads_filename, genome_absolute_path, sample_platform, results_filename, soft_paths_dict, threads):
+    if "/" in results_filename:
+        print("Error: results_filename contains '/'", file=sys.stderr)
+        sys.exit(1)
+    tmp_root = get_tmp_root()
+    tmp_bcftools_dir = os.path.join(tmp_root, sample_index, genome, run_info, "tmp_bcftools_results")
+    if os.path.exists(tmp_bcftools_dir):
+        hfbase.get_cli_output_lines("rm -rf " + tmp_bcftools_dir, side_effect=True)
+    os.makedirs(tmp_bcftools_dir)
+    backup_info_dir = "backup_info"
+    if not os.path.exists(backup_info_dir):
+        os.makedirs(backup_info_dir)
+    if os.path.exists(results_filename):
+        os.remove(results_filename)
+    for sidecar_file in [
+        "bcftools_runtime.tsv",
+        "bcftools_runtime_summary.tsv",
+        "bcftools_failed_reads.tsv",
+    ]:
+        backup_sidecar_file = os.path.join(backup_info_dir, sidecar_file)
+        if os.path.exists(backup_sidecar_file):
+            os.remove(backup_sidecar_file)
+
+    read_records = list(SeqIO.parse(reads_filename, "fasta"))
+    read_ids = [read_record.id for read_record in read_records]
+    if len(read_ids) == 0:
+        open(results_filename, "wt").close()
+        _write_tsv(os.path.join(backup_info_dir, "bcftools_runtime.tsv"), [BCFTOOLS_RUNTIME_HEADER])
+        _write_tsv(
+            os.path.join(backup_info_dir, "bcftools_runtime_summary.tsv"),
+            [
+                ["metric", "value"],
+                ["read_count", "0"],
+                ["reads_with_alignment_bam", "0"],
+                ["failed_count", "0"],
+                ["total_calls", "0"],
+                ["shared_minimap2_samtools_seconds", "0.000000"],
+                ["split_bam_seconds", "0.000000"],
+                ["sum_bcftools_seconds", "0.000000"],
+                ["threads", str(threads)],
+            ],
+        )
+        _write_tsv(
+            os.path.join(backup_info_dir, "bcftools_failed_reads.tsv"),
+            [["read_id", "exit_status", "message", "stderr"]],
+        )
+        return
+
+    name_sorted_bam = os.path.join(tmp_bcftools_dir, "variant_cov.name_sorted.bam")
+    alignment_seconds, alignment_command, alignment_stderr = _write_name_sorted_variant_bam(
+        reads_filename,
+        genome_absolute_path,
+        sample_platform,
+        soft_paths_dict,
+        threads,
+        name_sorted_bam,
+    )
+    read_bam_paths, seen_read_ids, split_bam_seconds = _split_name_sorted_bam_by_read(
+        name_sorted_bam,
+        read_ids,
+        tmp_bcftools_dir,
+    )
+
+    with cf.ThreadPoolExecutor(int(threads)) as tex:
+        futures = []
+        for read_index, read_id in enumerate(read_ids):
+            output_file = os.path.join(tmp_bcftools_dir, "read_" + str(read_index) + "_bcftools_calls.txt")
+            futures.append(
+                tex.submit(
+                    run_bcftools_from_bam,
+                    read_id,
+                    read_bam_paths.get(read_id),
+                    genome_absolute_path,
+                    soft_paths_dict,
+                    output_file,
+                )
+            )
+        runtime_by_read_id = {}
+        for future in cf.as_completed(futures):
+            runtime = future.result()
+            runtime_by_read_id[runtime["read_id"]] = runtime
+
+    with open(results_filename, "wt") as fout:
+        for read_index, read_id in enumerate(read_ids):
+            output_file = os.path.join(tmp_bcftools_dir, "read_" + str(read_index) + "_bcftools_calls.txt")
+            if os.path.exists(output_file):
+                with open(output_file) as fin:
+                    fout.write(fin.read())
+
+    runtime_rows = [BCFTOOLS_RUNTIME_HEADER]
+    failed_rows = [["read_id", "exit_status", "message", "stderr"]]
+    total_calls = 0
+    failed_count = 0
+    sum_bcftools_seconds = 0.0
+    for read_id in read_ids:
+        runtime = runtime_by_read_id[read_id]
+        total_calls += int(runtime["calls_count"])
+        sum_bcftools_seconds += float(runtime["bcftools_seconds"])
+        runtime_rows.append([
+            read_id,
+            f'{float(runtime["minimap2_seconds"]):.6f}',
+            f'{float(runtime["samtools_seconds"]):.6f}',
+            f'{float(runtime["bcftools_seconds"]):.6f}',
+            str(runtime["calls_count"]),
+            str(runtime["exit_status"]),
+            str(runtime["message"]),
+        ])
+        if int(runtime["exit_status"]) != 0:
+            failed_count += 1
+            failed_rows.append([
+                read_id,
+                str(runtime["exit_status"]),
+                str(runtime["message"]),
+                str(runtime["stderr"]).replace("\n", "\\n"),
+            ])
+
+    _write_tsv(os.path.join(backup_info_dir, "bcftools_runtime.tsv"), runtime_rows)
+    _write_tsv(os.path.join(backup_info_dir, "bcftools_failed_reads.tsv"), failed_rows)
+    _write_tsv(
+        os.path.join(backup_info_dir, "bcftools_runtime_summary.tsv"),
+        [
+            ["metric", "value"],
+            ["read_count", str(len(read_ids))],
+            ["reads_with_alignment_bam", str(len(seen_read_ids))],
+            ["failed_count", str(failed_count)],
+            ["total_calls", str(total_calls)],
+            ["shared_minimap2_samtools_seconds", f"{alignment_seconds:.6f}"],
+            ["split_bam_seconds", f"{split_bam_seconds:.6f}"],
+            ["sum_bcftools_seconds", f"{sum_bcftools_seconds:.6f}"],
+            ["threads", str(threads)],
+            ["alignment_command", alignment_command],
+            ["alignment_stderr", alignment_stderr.replace("\n", "\\n")],
+        ],
+    )
+
+    hfbase.get_cli_output_lines("rm -rf " + tmp_bcftools_dir, side_effect=True)
 
 
 def snv_or_indel(input_file, output_file):
