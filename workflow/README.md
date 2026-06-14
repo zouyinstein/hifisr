@@ -227,13 +227,28 @@ Snakemake resumes from file endpoints. For example:
 - `check_runtime_dependencies` checks every executable listed in `soft_paths`
   and verifies the Python packages in `requirements-dev.txt`.
 - `reads_ready` stops after mito/plastid read extraction. Downstream steps use
-  these all-read FASTQ files directly.
+  `reads/mito.fastq.gz` and `reads/plastid.fastq.gz`; these files are randomly
+  capped by `downstream_read_limit` when the extracted read count is above the
+  configured limit.
 - `draft_for_manual_edit` stops after draft GFA and PNG files are ready.
 - `polish_alignment_variant` runs polish/alignment plus read-variant analysis for mito and plastid.
 - `polish_alignment_variant_review_inputs` verifies the polish/alignment variant
   outputs needed for manual review exist.
 - `verify_corrected_genome` runs only the genomes listed in `run3.genomes`.
 - `final` returns run_3 output for genomes listed in `run3.genomes`, otherwise run_2 output.
+
+Set the downstream read cap per genome in the workflow config. A value of `0`
+keeps all extracted reads for that genome:
+
+```yaml
+downstream_read_limit:
+  mito: 50000
+  plastid: 50000
+```
+
+Top-level read-statistics files such as `mito_id_length_qual.txt` remain the
+statistics for all extracted organelle reads. Sampling-specific IDs, statistics,
+plots, and the summary table are written under `reads/backup_info/`.
 
 ## Manual Breakpoint 1: GFA_Editor
 

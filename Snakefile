@@ -95,6 +95,9 @@ THREADS_READS = int(THREADS.get("reads", 8))
 THREADS_DRAFT = int(THREADS.get("draft", 8))
 THREADS_POLISH = int(THREADS.get("polish", 8))
 THREADS_VARIANTS = int(THREADS.get("variants", 8))
+DOWNSTREAM_READ_LIMIT = config.get("downstream_read_limit", {})
+DOWNSTREAM_READ_LIMIT_MITO = int(DOWNSTREAM_READ_LIMIT.get("mito", 50000))
+DOWNSTREAM_READ_LIMIT_PLASTID = int(DOWNSTREAM_READ_LIMIT.get("plastid", 50000))
 
 STANDARD_DRAFT_ASSEMBLY_MODES = {"mecat_flye", "flye"}
 MITO_SIMPLE_DRAFT_ASSEMBLY_MODES = {"ms", "mh", "mx"}
@@ -525,7 +528,9 @@ rule extract_mtpt_reads:
     threads: THREADS_READS
     params:
         env=common_env(),
-        script=str(SCRIPT_DIR / "get_mtpt_reads.py")
+        script=str(SCRIPT_DIR / "get_mtpt_reads.py"),
+        mito_read_limit=DOWNSTREAM_READ_LIMIT_MITO,
+        plastid_read_limit=DOWNSTREAM_READ_LIMIT_PLASTID
     log:
         str(LOG_DIR / "extract_mtpt_reads.log")
     shell:
@@ -535,6 +540,7 @@ rule extract_mtpt_reads:
         cd "{RESULTS_DIR}"
         "{input.python}" "{params.script}" "{input.soft_paths}" "{SAMPLE}" \
           "{input.mito_ref}" "{input.plastid_ref}" "{input.reads}" "{threads}" \
+          "{params.mito_read_limit}" "{params.plastid_read_limit}" \
           > "{log}" 2>&1
         """
 

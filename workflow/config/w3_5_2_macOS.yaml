@@ -18,6 +18,10 @@ threads:
   polish: 8
   variants: 8
 
+downstream_read_limit:
+  mito: 50000
+  plastid: 50000
+
 draft_assembly:
   modes:
     - ms

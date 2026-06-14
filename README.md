@@ -578,6 +578,19 @@ Analysis of an example wild-type *Arabidopsis thaliana* dataset Col-CEN ([ERR621
 python get_mtpt_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi001 /mnt/software/scripts/results/mito_rotated_293434.fasta /mnt/software/scripts/results/plastid_rotated_61049.fasta /mnt/software/scripts/results/Col-CEN.fastq 32
 ```
 
+The final downstream FASTQ files are `reads/mito.fastq.gz` and
+`reads/plastid.fastq.gz`. By default, each genome is capped at 50,000 extracted
+reads by random sampling. Direct script calls can override this with optional
+mito/plastid limits after `threads`; use `0` to keep all extracted reads:
+
+```bash
+python get_mtpt_reads.py soft_paths.txt Sample mito_ref.fasta plastid_ref.fasta reads.fastq.gz 32 50000 50000
+```
+
+The top-level read-statistics files and plots still describe all extracted
+organelle reads. Sampling-specific IDs, statistics, plots, and the cap summary
+are stored in `reads/backup_info/`.
+
 | All                                                                                                                           | mitochondria                                                                                                                            | plastid                                                                                                                               |
 | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | ![All](001.植物细胞器基因组组装后校验/版本A/细胞器代码库/hifisr-dev/hifisr/examples/example_1/all_length_qual_distribution.jpg) | ![mitochondria](001.植物细胞器基因组组装后校验/版本A/细胞器代码库/hifisr-dev/hifisr/examples/example_1/mito_length_qual_distribution.jpg) | ![plastid](001.植物细胞器基因组组装后校验/版本A/细胞器代码库/hifisr-dev/hifisr/examples/example_1/plastid_length_qual_distribution.jpg) |
@@ -585,7 +598,7 @@ python get_mtpt_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi
 #### Calling and calculating the frequencies of SVs, SNVs and small InDels with plotting
 
 ```bash
-# Estimation of variant frequencies using all extracted organelle reads
+# Estimation of variant frequencies using the capped downstream organelle reads
 python get_variants_in_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi001 mito run_1 /mnt/software/scripts/results/mito_rotated_293434.fasta /mnt/software/scripts/results/ATHiFi001/reads/mito.fastq.gz 32
 python get_variants_in_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi001 plastid run_1 /mnt/software/scripts/results/plastid_rotated_61049.fasta /mnt/software/scripts/results/ATHiFi001/reads/plastid.fastq.gz 32
 ```
