@@ -95,7 +95,53 @@ THREADS_READS = int(THREADS.get("reads", 8))
 THREADS_DRAFT = int(THREADS.get("draft", 8))
 THREADS_POLISH = int(THREADS.get("polish", 8))
 THREADS_VARIANTS = int(THREADS.get("variants", 8))
-SAMPLE_READ_COUNT = int(config.get("sample_read_count", 10000))
+
+STANDARD_DRAFT_ASSEMBLY_MODES = {"mecat_flye", "flye"}
+MITO_SIMPLE_DRAFT_ASSEMBLY_MODES = {"ms", "mh", "mx"}
+PLASTID_SIMPLE_DRAFT_ASSEMBLY_MODES = {"pl", "ps", "ph"}
+SIMPLE_DRAFT_ASSEMBLY_MODES = MITO_SIMPLE_DRAFT_ASSEMBLY_MODES | PLASTID_SIMPLE_DRAFT_ASSEMBLY_MODES
+PLASTID_DRAFT_MODE_MAP = {
+    "ms": "ps",
+    "mh": "ph",
+}
+DRAFT_MODE_ALIASES = {
+    "mecat+flye": "mecat_flye",
+    "mecat_flye": "mecat_flye",
+    "mecat": "mecat_flye",
+    "flye": "flye",
+    "all": "flye",
+    "ms": "ms",
+    "mh": "mh",
+    "mx": "mx",
+    "pl": "pl",
+    "ps": "ps",
+    "ph": "ph",
+}
+
+
+def normalize_draft_assembly_modes(value):
+    if isinstance(value, str):
+        raw_modes = [mode.strip() for mode in value.split(",")]
+    else:
+        raw_modes = list(value)
+    modes = []
+    for raw_mode in raw_modes:
+        mode = DRAFT_MODE_ALIASES.get(str(raw_mode).strip(), str(raw_mode).strip())
+        if not mode:
+            continue
+        if mode not in STANDARD_DRAFT_ASSEMBLY_MODES | SIMPLE_DRAFT_ASSEMBLY_MODES:
+            raise ValueError(f"Unsupported draft assembly mode: {mode}")
+        if mode not in modes:
+            modes.append(mode)
+    if not modes:
+        raise ValueError("draft_assembly.modes must contain at least one mode")
+    return modes
+
+
+DRAFT_ASSEMBLY_CFG = config.get("draft_assembly", {})
+DRAFT_ASSEMBLY_MODES = normalize_draft_assembly_modes(
+    DRAFT_ASSEMBLY_CFG.get("modes", ["ms", "mh", "mx"])
+)
 
 REF_CFG = config.get("references", {})
 ROTATE_REFS = bool(REF_CFG.get("rotate", False))
@@ -158,15 +204,7 @@ def draft_dir(genome):
 
 
 def genome_reads(genome):
-    return str(reads_dir() / f"{SAMPLE}_{genome}.fastq.gz")
-
-
-def sample_reads(genome):
-    return str(reads_dir() / "sample_reads" / f"sample_{genome}.fastq.gz")
-
-
-def filt_id_qual(genome):
-    return str(reads_dir() / "filt_reads" / f"filt_L10K_{genome}_id_length_qual.txt")
+    return str(reads_dir() / f"{genome}.fastq.gz")
 
 
 def selected_ref(genome):
@@ -185,14 +223,59 @@ def ref_for_workflow(genome):
 
 def edited_fasta(genome):
     default_name = {
-        "mito": "all_mito_500K_after_rr.edited.fasta",
-        "plastid": "all_plastid_150K_after_rr.edited.fasta",
+        "mito": "mito_checked_draft.fasta",
+        "plastid": "plastid_checked_draft.fasta",
     }[genome]
-    return _path(DRAFT_EDITED.get(genome, f"{draft_dir(genome)}/{default_name}"))
+    primary = Path(_path(DRAFT_EDITED.get(genome, f"{draft_dir(genome)}/{default_name}")))
+    backup = draft_dir(genome) / "backup_info" / primary.name
+    if not primary.exists() and backup.exists():
+        return str(backup)
+    return str(primary)
 
 
 def pos_ref_alt(genome):
     return _path(POS_REF_ALT.get(genome, f"{draft_dir(genome)}/pos_ref_alt.txt"))
+
+
+def draft_modes_for_genome(genome):
+    modes = []
+    for mode in DRAFT_ASSEMBLY_MODES:
+        if mode in STANDARD_DRAFT_ASSEMBLY_MODES:
+            genome_mode = mode
+        elif genome == "mito" and mode in MITO_SIMPLE_DRAFT_ASSEMBLY_MODES:
+            genome_mode = mode
+        elif genome == "plastid" and mode in PLASTID_SIMPLE_DRAFT_ASSEMBLY_MODES:
+            genome_mode = mode
+        elif genome == "plastid" and mode in PLASTID_DRAFT_MODE_MAP:
+            genome_mode = PLASTID_DRAFT_MODE_MAP[mode]
+        else:
+            continue
+        if genome_mode not in modes:
+            modes.append(genome_mode)
+    return modes
+
+
+def draft_modes_arg(genome):
+    modes = draft_modes_for_genome(genome)
+    if not modes:
+        raise ValueError(f"No draft assembly modes are configured for {genome}")
+    return ",".join(modes)
+
+
+def draft_simple_modes_for_genome(genome):
+    return [mode for mode in draft_modes_for_genome(genome) if mode in SIMPLE_DRAFT_ASSEMBLY_MODES]
+
+
+def draft_flye_modes_for_genome(genome):
+    return [mode for mode in draft_modes_for_genome(genome) if mode in STANDARD_DRAFT_ASSEMBLY_MODES]
+
+
+def draft_simple_modes_arg(genome):
+    return ",".join(draft_simple_modes_for_genome(genome))
+
+
+def draft_flye_modes_arg(genome):
+    return ",".join(draft_flye_modes_for_genome(genome))
 
 
 def polish_alignment_variant_aligned(genome):
@@ -222,23 +305,33 @@ def verify_corrected_genome_done(genome):
 def draft_outputs(genome):
     size = DRAFT_SIZE[genome]
     d = draft_dir(genome)
-    return [
-        str(d / f"mecat_{genome}_{size}K_before_rr.gfa"),
-        str(d / f"mecat_{genome}_{size}K_after_rr.gfa"),
-        str(d / f"all_{genome}_{size}K_before_rr.gfa"),
-        str(d / f"all_{genome}_{size}K_after_rr.gfa"),
-        str(d / f"mecat_{genome}_{size}K_before_rr.png"),
-        str(d / f"mecat_{genome}_{size}K_after_rr.png"),
-        str(d / f"all_{genome}_{size}K_before_rr.png"),
-        str(d / f"all_{genome}_{size}K_after_rr.png"),
-    ]
+    modes = draft_modes_for_genome(genome)
+    outputs = []
+    if "mecat_flye" in modes:
+        outputs.extend([
+            str(d / f"mecat_{genome}_{size}K_before_rr.gfa"),
+            str(d / f"mecat_{genome}_{size}K_after_rr.gfa"),
+            str(d / f"mecat_{genome}_{size}K_before_rr.png"),
+            str(d / f"mecat_{genome}_{size}K_after_rr.png"),
+        ])
+    if "flye" in modes:
+        outputs.extend([
+            str(d / f"all_{genome}_{size}K_before_rr.gfa"),
+            str(d / f"all_{genome}_{size}K_after_rr.gfa"),
+            str(d / f"all_{genome}_{size}K_before_rr.png"),
+            str(d / f"all_{genome}_{size}K_after_rr.png"),
+        ])
+    for mode in modes:
+        if mode in SIMPLE_DRAFT_ASSEMBLY_MODES:
+            outputs.append(str(d / f"simple_draft_asm_{genome}_{size}K_{mode}.gfa"))
+            outputs.append(str(d / f"simple_draft_asm_{genome}_{size}K_{mode}.png"))
+    return outputs
 
 
 def clean_intermediate_paths():
     paths = []
     for genome in GENOMES:
         paths.append(Path(genome_reads(genome)))
-        paths.append(Path(sample_reads(genome)))
 
     variant_runs = [(genome, RUN2) for genome in GENOMES]
     variant_runs.extend((genome, RUN3) for genome in RUN3_GENOMES)
@@ -262,6 +355,13 @@ def clean_intermediate_dirs():
 POLISH_ALIGNMENT_VARIANT_TARGETS = [
     polish_alignment_variant_table(g) for g in GENOMES
 ] + [polish_alignment_variant_done(g) for g in GENOMES]
+POLISH_ALIGNMENT_TARGETS = []
+for genome in GENOMES:
+    POLISH_ALIGNMENT_TARGETS.extend([
+        str(draft_dir(genome) / f"{genome}_flye_polish_aligned.fasta"),
+        str(draft_dir(genome) / f"{genome}_flye_polish_aligned_blastn_alignments.xlsx"),
+        str(draft_dir(genome) / f"{genome}_flye_polish_variants.txt"),
+    ])
 VERIFY_CORRECTED_GENOME_TARGETS = [
     verify_corrected_genome_table(g) for g in RUN3_GENOMES
 ] + [verify_corrected_genome_done(g) for g in RUN3_GENOMES]
@@ -299,13 +399,17 @@ rule references_ready:
 
 rule reads_ready:
     input:
-        expand(str(reads_dir() / "{sample}_{genome}.fastq.gz"), sample=[SAMPLE], genome=GENOMES),
-        expand(str(reads_dir() / "sample_reads" / "sample_{genome}.fastq.gz"), genome=GENOMES)
+        expand(str(reads_dir() / "{genome}.fastq.gz"), genome=GENOMES)
 
 
 rule draft_for_manual_edit:
     input:
         draft_outputs("mito") + draft_outputs("plastid")
+
+
+rule polish_alignment_ready:
+    input:
+        POLISH_ALIGNMENT_TARGETS
 
 
 rule polish_alignment_variant:
@@ -414,8 +518,8 @@ rule extract_mtpt_reads:
         mito_ref=lambda wc: ref_for_workflow("mito"),
         plastid_ref=lambda wc: ref_for_workflow("plastid")
     output:
-        mito_fastq=str(reads_dir() / f"{SAMPLE}_mito.fastq.gz"),
-        plastid_fastq=str(reads_dir() / f"{SAMPLE}_plastid.fastq.gz"),
+        mito_fastq=str(reads_dir() / "mito.fastq.gz"),
+        plastid_fastq=str(reads_dir() / "plastid.fastq.gz"),
         mito_stats=str(reads_dir() / "mito_id_length_qual.txt"),
         plastid_stats=str(reads_dir() / "plastid_id_length_qual.txt")
     threads: THREADS_READS
@@ -435,71 +539,22 @@ rule extract_mtpt_reads:
         """
 
 
-rule filter_read_ids:
-    input:
-        soft_paths=SOFT_PATHS,
-        python=PYTHON,
-        mito_stats=str(reads_dir() / "mito_id_length_qual.txt"),
-        plastid_stats=str(reads_dir() / "plastid_id_length_qual.txt")
-    output:
-        mito_id_qual=filt_id_qual("mito"),
-        plastid_id_qual=filt_id_qual("plastid"),
-        mito_ids=str(reads_dir() / "filt_reads" / "filt_L10K_mito_ids.txt"),
-        plastid_ids=str(reads_dir() / "filt_reads" / "filt_L10K_plastid_ids.txt")
-    params:
-        env=common_env(),
-        script=str(SCRIPT_DIR / "filt_read_ids.py")
-    log:
-        str(LOG_DIR / "filter_read_ids.log")
-    shell:
-        r"""
-        {params.env}
-        {RUNTIME_DIRS}
-        cd "{RESULTS_DIR}"
-        "{input.python}" "{params.script}" "{input.soft_paths}" "{SAMPLE}" \
-          "{input.mito_stats}" "{input.plastid_stats}" 10000 0 \
-          > "{log}" 2>&1
-        """
-
-
-rule sample_reads:
-    input:
-        soft_paths=SOFT_PATHS,
-        python=PYTHON,
-        id_qual=lambda wc: filt_id_qual(wc.genome),
-        genome_fastq=lambda wc: genome_reads(wc.genome)
-    output:
-        fastq=str(reads_dir() / "sample_reads" / "sample_{genome}.fastq.gz"),
-        id_qual=str(reads_dir() / "sample_reads" / "sample_{genome}_id_length_qual.txt")
-    threads: THREADS_READS
-    params:
-        env=common_env(),
-        script=str(SCRIPT_DIR / "sample_reads.py")
-    log:
-        str(LOG_DIR / "sample_reads.{genome}.log")
-    shell:
-        r"""
-        {params.env}
-        {RUNTIME_DIRS}
-        cd "{RESULTS_DIR}"
-        "{input.python}" "{params.script}" "{input.soft_paths}" "{SAMPLE}" "{wildcards.genome}" \
-          "{input.id_qual}" "{SAMPLE_READ_COUNT}" "{threads}" \
-          > "{log}" 2>&1
-        """
-
-
 rule draft_assembly_mito:
     input:
         soft_paths=SOFT_PATHS,
         python=PYTHON,
         ref=lambda wc: ref_for_workflow("mito"),
-        reads=sample_reads("mito")
+        reads=lambda wc: genome_reads("mito"),
+        full_reads=lambda wc: genome_reads("mito")
     output:
         draft_outputs("mito")
     threads: THREADS_DRAFT
     params:
         env=common_env(),
-        script=str(SCRIPT_DIR / "get_draft_assembly.py")
+        simple_modes=lambda wc: draft_simple_modes_arg("mito"),
+        flye_modes=lambda wc: draft_flye_modes_arg("mito"),
+        script=str(SCRIPT_DIR / "get_draft_assembly.py"),
+        flye_script=str(SCRIPT_DIR / "get_draft_assembly_flye.py")
     log:
         str(LOG_DIR / "draft_assembly.mito.log")
     shell:
@@ -507,9 +562,16 @@ rule draft_assembly_mito:
         {params.env}
         {RUNTIME_DIRS}
         cd "{RESULTS_DIR}"
-        "{input.python}" "{params.script}" "{input.soft_paths}" "{SAMPLE}" mito \
-          "{input.ref}" "{input.reads}" "{threads}" \
-          > "{log}" 2>&1
+        if [ -n "{params.simple_modes}" ]; then
+          "{input.python}" "{params.script}" "{input.soft_paths}" "{SAMPLE}" mito \
+            "{input.ref}" "{input.full_reads}" "{threads}" "{params.simple_modes}" "{input.full_reads}" \
+            > "{log}" 2>&1
+        fi
+        if [ -n "{params.flye_modes}" ]; then
+          "{input.python}" "{params.flye_script}" "{input.soft_paths}" "{SAMPLE}" mito \
+            "{input.ref}" "{input.reads}" "{threads}" "{params.flye_modes}" \
+            >> "{log}" 2>&1
+        fi
         """
 
 
@@ -518,13 +580,17 @@ rule draft_assembly_plastid:
         soft_paths=SOFT_PATHS,
         python=PYTHON,
         ref=lambda wc: ref_for_workflow("plastid"),
-        reads=sample_reads("plastid")
+        reads=lambda wc: genome_reads("plastid"),
+        full_reads=lambda wc: genome_reads("plastid")
     output:
         draft_outputs("plastid")
     threads: THREADS_DRAFT
     params:
         env=common_env(),
-        script=str(SCRIPT_DIR / "get_draft_assembly.py")
+        simple_modes=lambda wc: draft_simple_modes_arg("plastid"),
+        flye_modes=lambda wc: draft_flye_modes_arg("plastid"),
+        script=str(SCRIPT_DIR / "get_draft_assembly.py"),
+        flye_script=str(SCRIPT_DIR / "get_draft_assembly_flye.py")
     log:
         str(LOG_DIR / "draft_assembly.plastid.log")
     shell:
@@ -532,9 +598,16 @@ rule draft_assembly_plastid:
         {params.env}
         {RUNTIME_DIRS}
         cd "{RESULTS_DIR}"
-        "{input.python}" "{params.script}" "{input.soft_paths}" "{SAMPLE}" plastid \
-          "{input.ref}" "{input.reads}" "{threads}" \
-          > "{log}" 2>&1
+        if [ -n "{params.simple_modes}" ]; then
+          "{input.python}" "{params.script}" "{input.soft_paths}" "{SAMPLE}" plastid \
+            "{input.ref}" "{input.full_reads}" "{threads}" "{params.simple_modes}" "{input.full_reads}" \
+            > "{log}" 2>&1
+        fi
+        if [ -n "{params.flye_modes}" ]; then
+          "{input.python}" "{params.flye_script}" "{input.soft_paths}" "{SAMPLE}" plastid \
+            "{input.ref}" "{input.reads}" "{threads}" "{params.flye_modes}" \
+            >> "{log}" 2>&1
+        fi
         """
 
 
@@ -571,7 +644,7 @@ rule polish_alignment_variant_calling:
         soft_paths=SOFT_PATHS,
         python=PYTHON,
         ref=lambda wc: polish_alignment_variant_aligned(wc.genome),
-        reads=lambda wc: sample_reads(wc.genome)
+        reads=lambda wc: genome_reads(wc.genome)
     output:
         table=str(sample_dir() / "{genome}" / RUN2 / "variants_anno_combined_depth_frq_filter.xlsx"),
         done=touch(str(sample_dir() / "{genome}" / RUN2 / ".snakemake.done"))
@@ -619,7 +692,7 @@ rule verify_corrected_genome_variants:
         soft_paths=SOFT_PATHS,
         python=PYTHON,
         ref=lambda wc: corrected_genome_fasta(wc.genome),
-        reads=lambda wc: sample_reads(wc.genome)
+        reads=lambda wc: genome_reads(wc.genome)
     output:
         table=str(sample_dir() / "{genome}" / RUN3 / "variants_anno_combined_depth_frq_filter.xlsx"),
         done=touch(str(sample_dir() / "{genome}" / RUN3 / ".snakemake.done"))

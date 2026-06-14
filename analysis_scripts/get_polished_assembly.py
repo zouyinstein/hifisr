@@ -13,6 +13,23 @@ import hifisr_functions.base as hfbase
 import hifisr_functions.references as hfref
 import hifisr_functions.reports as hfrps
 import os
+import shutil
+
+
+def move_backup_info(genome):
+    backup_dir = "backup_info"
+    keep_prefixes = (genome + "_flye_polish", "simple_draft_asm")
+    if not os.path.exists(backup_dir):
+        os.makedirs(backup_dir)
+    for filename in sorted(os.listdir(".")):
+        if filename == backup_dir or filename.startswith(keep_prefixes):
+            continue
+        backup_path = os.path.join(backup_dir, filename)
+        if os.path.isdir(backup_path) and not os.path.islink(backup_path):
+            shutil.rmtree(backup_path)
+        elif os.path.exists(backup_path):
+            os.remove(backup_path)
+        shutil.move(filename, backup_path)
 
 
 # Usage: python
@@ -64,4 +81,5 @@ if rc_or_not == 1:
 if rot_or_not == 1:
     print("The draft genome has been rotated.")
 
+move_backup_info(genome)
 os.chdir("../../..")

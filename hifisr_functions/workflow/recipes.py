@@ -6,6 +6,7 @@ from hifisr_functions.references import (
     flye_assemble,
     flye_polish,
     mecat_cns,
+    simple_draft_asm,
 )
 
 
@@ -15,6 +16,7 @@ FUNCTION_PURITY = {
     "flye_assemble": "impure",
     "flye_polish": "impure",
     "mecat_cns": "impure",
+    "simple_draft_asm": "impure",
 }
 
 
@@ -24,4 +26,5 @@ __all__ = [
     "flye_assemble",
     "flye_polish",
     "mecat_cns",
+    "simple_draft_asm",
 ]

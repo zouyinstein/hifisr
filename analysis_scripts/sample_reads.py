@@ -60,11 +60,15 @@ sample_fastq_file = "sample_reads/" + sample_prefix + ".fastq.gz"
 sample_fastq_file_uncompressed = "sample_reads/" + sample_prefix + ".fastq"
 if os.path.exists(sample_fastq_file_uncompressed):
     os.remove(sample_fastq_file_uncompressed)
-fastq_file = sample_index + "_" + genome + ".fastq"
-if os.path.exists(fastq_file + ".gz"):
-    fastq_file = fastq_file + ".gz"
-elif not os.path.exists(fastq_file):
-    print("Cannot find " + fastq_file + " or " + fastq_file + ".gz", file=sys.stderr)
+fastq_candidates = [
+    genome + ".fastq.gz",
+    genome + ".fastq",
+    sample_index + "_" + genome + ".fastq.gz",
+    sample_index + "_" + genome + ".fastq",
+]
+fastq_file = next((path for path in fastq_candidates if os.path.exists(path)), None)
+if fastq_file is None:
+    print("Cannot find any genome reads fastq: " + ", ".join(fastq_candidates), file=sys.stderr)
     sys.exit(1)
 
 pigz = soft_paths_dict.get("pigz", "pigz")

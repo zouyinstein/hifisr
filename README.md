@@ -32,7 +32,7 @@ work, but they have not been tested for this workflow.
 
 The workflow-facing external tools are `python`, `minimap2`, `samtools`,
 `seqkit`, `mecat`, `blastn`, `bcftools`, `bamtools`, `pigz`, `bandage`,
-`hifiasm`, `flye`, and `canu`. The macOS example may also include legacy
+`hifiasm`, `flye`, `canu`, and `simple_draft_asm`. The macOS example may also include legacy
 entries such as `meryl` and `winnowmap`; these are not required by the current
 W3-5-2 Snakemake workflow.
 
@@ -99,7 +99,7 @@ and the Python packages installed in the workflow Python environment.
 
 Third-party tools checked from `soft_paths`: `python`, `minimap2`, `samtools`,
 `seqkit`, `mecat`, `blastn`, `bcftools`, `bamtools`, `pigz`, `bandage`,
-`hifiasm`, `flye`, and `canu`.
+`hifiasm`, `flye`, `canu`, and `simple_draft_asm`.
 
 Python packages checked from `requirements-dev.txt`: `biopython`, `pysam`,
 `pandas`, `numpy`, `openpyxl`, `xlsxwriter`, `matplotlib`, `polars`,
@@ -133,7 +133,8 @@ starting from scratch:
 
 The `soft_paths.txt` file must be tab-delimited and include the paths for
 `python`, `minimap2`, `samtools`, `seqkit`, `mecat`, `blastn`, `bcftools`,
-`bamtools`, `pigz`, `bandage`, `hifiasm`, `flye`, and `canu`. The workflow uses
+`bamtools`, `pigz`, `bandage`, `hifiasm`, `flye`, `canu`, and
+`simple_draft_asm`. The workflow uses
 this file to derive executable paths and PATH entries, so on an Ubuntu server
 the only machine-specific workflow file should be the corresponding
 `soft_paths.txt`. The `python` entry should point to an environment where
@@ -176,6 +177,7 @@ bandage	/path/to/Bandage
 hifiasm	/path/to/hifiasm
 flye	/path/to/flye
 canu	/path/to/canu
+simple_draft_asm	/path/to/simple_draft_asm
 ```
 
 Replace every `/path/to/...` entry with the real Ubuntu executable path. For
@@ -284,11 +286,17 @@ After `draft_for_manual_edit`, inspect and linearize the GFA files manually,
 for example with GFA_Editor, and save the edited FASTA files at:
 
 ```text
-results/W3-5-2/draft_assembly/mito/all_mito_500K_after_rr.edited.fasta
-results/W3-5-2/draft_assembly/plastid/all_plastid_150K_after_rr.edited.fasta
+results/W3-5-2/draft_assembly/mito/mito_checked_draft.fasta
+results/W3-5-2/draft_assembly/plastid/plastid_checked_draft.fasta
 ```
 
-Then continue with polish/alignment and variant calling:
+Then continue with polish/alignment only:
+
+```bash
+python -m snakemake --cores 8 polish_alignment_ready
+```
+
+Continue with read-variant calling after review:
 
 ```bash
 python -m snakemake --cores 8 polish_alignment_variant
@@ -353,8 +361,7 @@ files, `pos_ref_alt.txt`, small read-statistics files, and logs.
 It deletes only the following regenerable files and directories under
 `results/`:
 
-- `results/{sample}/reads/{sample}_{genome}.fastq.gz`
-- `results/{sample}/reads/sample_reads/sample_{genome}.fastq.gz`
+- `results/{sample}/reads/{genome}.fastq.gz`
 - `results/{sample}/{genome}/{run}/reads.fasta`
 - `results/{sample}/{genome}/{run}/new_reads.fasta`
 - `results/{sample}/{genome}/{run}/FL.fasta`
@@ -454,14 +461,20 @@ genomes:
   - mito
   - plastid
 
+draft_assembly:
+  modes:
+    - ms
+    - mh
+    - mx
+
 references:
   rotate: false
   mito: "{project_dir}/references/MySample_mito.fa"
   plastid: "{project_dir}/references/MySample_plastid.fa"
 
 draft_edited:
-  mito: "{results_dir}/{sample}/draft_assembly/mito/all_mito_500K_after_rr.edited.fasta"
-  plastid: "{results_dir}/{sample}/draft_assembly/plastid/all_plastid_150K_after_rr.edited.fasta"
+  mito: "{results_dir}/{sample}/draft_assembly/mito/mito_checked_draft.fasta"
+  plastid: "{results_dir}/{sample}/draft_assembly/plastid/plastid_checked_draft.fasta"
 
 run2:
   name: run_2
@@ -487,8 +500,25 @@ python -m snakemake --configfile workflow/config/my_sample.yaml \
   --config soft_paths=deps/soft_paths.txt --cores 8 draft_for_manual_edit
 ```
 
+The `draft_assembly.modes` list controls draft graph generation. By default,
+`ms`, `mh`, and `mx` run `simple_draft_asm` on full organelle reads for mito;
+plastid maps those simple modes to `ps` and `ph` where available and writes
+renamed `simple_draft_asm_*_*.gfa` plus PNG files. Legacy `mecat_flye` and
+`flye` modes are handled by `analysis_scripts/get_draft_assembly_flye.py` when
+explicitly listed. All configured draft, polish, and variant targets consume
+`results/{sample}/reads/{genome}.fastq.gz`; internal filter/sample steps are not
+part of the Snakemake DAG.
+
 After `draft_for_manual_edit`, inspect and linearize the GFA files manually and
-save edited FASTA files at the paths listed in `draft_edited`. Then continue:
+save checked FASTA files at the paths listed in `draft_edited`. To stop before
+read-variant calling, continue with:
+
+```bash
+python -m snakemake --configfile workflow/config/my_sample.yaml \
+  --config soft_paths=deps/soft_paths.txt --cores 8 polish_alignment_ready
+```
+
+Then run read-variant calling:
 
 ```bash
 python -m snakemake --configfile workflow/config/my_sample.yaml \
@@ -555,16 +585,9 @@ python get_mtpt_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi
 #### Calling and calculating the frequencies of SVs, SNVs and small InDels with plotting
 
 ```bash
-# filter the reads: remove reads shorter than 10 kb
-python filt_read_ids.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi001 mito_id_length_qual.txt plastid_id_length_qual.txt 10000 0
-
-# random sampling of 10000 reads for mitochondrial and plastid genomes, respectively
-python sample_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi001 mito filt_L10K_mito_id_length_qual.txt 10000 32
-python sample_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi001 plastid filt_L10K_plastid_id_length_qual.txt 10000 32
-
-# Estimation of variant frequencies
-python get_variants_in_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi001 mito run_1 /mnt/software/scripts/results/mito_rotated_293434.fasta /mnt/software/scripts/results/ATHiFi001/reads/sample_reads/sample_mito.fastq.gz 32
-python get_variants_in_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi001 plastid run_1 /mnt/software/scripts/results/plastid_rotated_61049.fasta /mnt/software/scripts/results/ATHiFi001/reads/sample_reads/sample_plastid.fastq.gz 32
+# Estimation of variant frequencies using all extracted organelle reads
+python get_variants_in_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi001 mito run_1 /mnt/software/scripts/results/mito_rotated_293434.fasta /mnt/software/scripts/results/ATHiFi001/reads/mito.fastq.gz 32
+python get_variants_in_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi001 plastid run_1 /mnt/software/scripts/results/plastid_rotated_61049.fasta /mnt/software/scripts/results/ATHiFi001/reads/plastid.fastq.gz 32
 ```
 
 | mitochondria                                        | plastid                                                |
@@ -605,14 +628,8 @@ python get_mtpt_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt Ambore
 #### Get the draft assembly of mitochondrial genome
 
 ```bash
-# filter the reads: remove reads shorter than 10 kb
-python filt_read_ids.py /mnt/software/scripts/hifisr/deps/soft_paths.txt Amborella_1 mito_id_length_qual.txt plastid_id_length_qual.txt 10000 0
-
-# random sampling of 10000 reads for mt genome
-python sample_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt Amborella_1 mito filt_L10K_mito_id_length_qual.txt 10000 32
-
-# get the draft assembly
-python get_draft_assembly.py /mnt/software/scripts/hifisr/deps/soft_paths.txt Amborella_1 mito mt_all.fasta /mnt/software/scripts/results/Amborella_1/reads/sample_reads/sample_mito.fastq.gz 20
+# get the draft assembly using all extracted mitochondrial reads
+python get_draft_assembly.py /mnt/software/scripts/hifisr/deps/soft_paths.txt Amborella_1 mito mt_all.fasta /mnt/software/scripts/results/Amborella_1/reads/mito.fastq.gz 20
 ```
 
 | MECAT2 + metaFlye                      | metaFlye                             |
@@ -625,7 +642,7 @@ python get_draft_assembly.py /mnt/software/scripts/hifisr/deps/soft_paths.txt Am
 ```bash
 # Manually resolve the graph in Bandage, and save the results as draft.fasta
 # Split the reads by contig
-python get_reads_by_contig.py /mnt/software/scripts/hifisr/deps/soft_paths.txt Amborella_1 mt_draft_contigs draft.fasta /mnt/software/scripts/results/Amborella_1/reads/sample_reads/sample_mito.fastq.gz 32
+python get_reads_by_contig.py /mnt/software/scripts/hifisr/deps/soft_paths.txt Amborella_1 mt_draft_contigs draft.fasta /mnt/software/scripts/results/Amborella_1/reads/mito.fastq.gz 32
 
 # Check the correctness of the contigs by calling and calculating variant frequencies
 python get_variants_in_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt Amborella_1 mito contig_1 contigs.part_contig_1.fa contig_1.fastq 32

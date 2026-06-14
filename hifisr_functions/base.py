@@ -28,6 +28,7 @@ REQUIRED_WORKFLOW_TOOLS = [
     "hifiasm",
     "flye",
     "canu",
+    "simple_draft_asm",
 ]
 
 PYTHON_IMPORT_NAMES = {

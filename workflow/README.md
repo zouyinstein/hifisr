@@ -28,7 +28,7 @@ Run commands from the `hifisr` project root and prepare:
 The `soft_paths.txt` file must be tab-delimited and include the executables
 used by the workflow, including `python`, `minimap2`, `samtools`, `seqkit`,
 `mecat`, `blastn`, `bcftools`, `bamtools`, `pigz`, `bandage`, `hifiasm`,
-`flye`, and `canu`. The `python` entry should point to an environment where
+`flye`, `canu`, and `simple_draft_asm`. The `python` entry should point to an environment where
 Snakemake and the HiFiSR Python dependencies are installed. The workflow does
 not require installing the `hifisr` package into the virtual environment;
 scripts under `analysis_scripts/` import the local source code from
@@ -81,6 +81,7 @@ bandage	/path/to/Bandage
 hifiasm	/path/to/hifiasm
 flye	/path/to/flye
 canu	/path/to/canu
+simple_draft_asm	/path/to/simple_draft_asm
 ```
 
 Replace every `/path/to/...` entry with the real Ubuntu executable path. For
@@ -225,7 +226,8 @@ Snakemake resumes from file endpoints. For example:
 - `references_ready` checks that workflow references are available.
 - `check_runtime_dependencies` checks every executable listed in `soft_paths`
   and verifies the Python packages in `requirements-dev.txt`.
-- `reads_ready` stops after mito/plastid read extraction, filtering, and sampling.
+- `reads_ready` stops after mito/plastid read extraction. Downstream steps use
+  these all-read FASTQ files directly.
 - `draft_for_manual_edit` stops after draft GFA and PNG files are ready.
 - `polish_alignment_variant` runs polish/alignment plus read-variant analysis for mito and plastid.
 - `polish_alignment_variant_review_inputs` verifies the polish/alignment variant
@@ -240,11 +242,17 @@ files at the paths in config:
 
 ```yaml
 draft_edited:
-  mito: "{results_dir}/{sample}/draft_assembly/mito/all_mito_500K_after_rr.edited.fasta"
-  plastid: "{results_dir}/{sample}/draft_assembly/plastid/all_plastid_150K_after_rr.edited.fasta"
+  mito: "{results_dir}/{sample}/draft_assembly/mito/mito_checked_draft.fasta"
+  plastid: "{results_dir}/{sample}/draft_assembly/plastid/plastid_checked_draft.fasta"
 ```
 
-Then continue:
+Then continue with polish/alignment only:
+
+```bash
+python -m snakemake --cores 8 polish_alignment_ready
+```
+
+Continue with read-variant calling after review:
 
 ```bash
 python -m snakemake --cores 8 polish_alignment_variant
@@ -297,8 +305,7 @@ files, `pos_ref_alt.txt`, small read-statistics files, and logs.
 
 It removes large regenerable FASTQ/FASTA intermediates:
 
-- `results/{sample}/reads/{sample}_{genome}.fastq.gz`
-- `results/{sample}/reads/sample_reads/sample_{genome}.fastq.gz`
+- `results/{sample}/reads/{genome}.fastq.gz`
 - `results/{sample}/{genome}/{run}/reads.fasta`
 - `results/{sample}/{genome}/{run}/new_reads.fasta`
 - `results/{sample}/{genome}/{run}/FL.fasta`
@@ -363,14 +370,20 @@ genomes:
   - mito
   - plastid
 
+draft_assembly:
+  modes:
+    - ms
+    - mh
+    - mx
+
 references:
   rotate: false
   mito: "{project_dir}/references/MySample_mito.fa"
   plastid: "{project_dir}/references/MySample_plastid.fa"
 
 draft_edited:
-  mito: "{results_dir}/{sample}/draft_assembly/mito/all_mito_500K_after_rr.edited.fasta"
-  plastid: "{results_dir}/{sample}/draft_assembly/plastid/all_plastid_150K_after_rr.edited.fasta"
+  mito: "{results_dir}/{sample}/draft_assembly/mito/mito_checked_draft.fasta"
+  plastid: "{results_dir}/{sample}/draft_assembly/plastid/plastid_checked_draft.fasta"
 
 run2:
   name: run_2
@@ -396,8 +409,25 @@ python -m snakemake --configfile workflow/config/my_sample.yaml \
   --config soft_paths=deps/soft_paths.txt --cores 8 draft_for_manual_edit
 ```
 
+The `draft_assembly.modes` list controls draft graph generation. By default,
+`ms`, `mh`, and `mx` run `simple_draft_asm` on full organelle reads for mito;
+plastid maps those simple modes to `ps` and `ph` where available and writes
+renamed `simple_draft_asm_*_*.gfa` plus PNG files. Legacy `mecat_flye` and
+`flye` modes are handled by `analysis_scripts/get_draft_assembly_flye.py` when
+explicitly listed. All configured draft, polish, and variant targets consume
+`results/{sample}/reads/{genome}.fastq.gz`; internal filter/sample steps are not
+part of the Snakemake DAG.
+
 After `draft_for_manual_edit`, inspect and linearize the GFA files manually and
-save edited FASTA files at the paths listed in `draft_edited`. Then continue:
+save checked FASTA files at the paths listed in `draft_edited`. To stop before
+read-variant calling, continue with:
+
+```bash
+python -m snakemake --configfile workflow/config/my_sample.yaml \
+  --config soft_paths=deps/soft_paths.txt --cores 8 polish_alignment_ready
+```
+
+Then run read-variant calling:
 
 ```bash
 python -m snakemake --configfile workflow/config/my_sample.yaml \

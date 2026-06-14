@@ -18,7 +18,11 @@ threads:
   polish: 8
   variants: 8
 
-sample_read_count: 10000
+draft_assembly:
+  modes:
+    - ms
+    - mh
+    - mx
 
 references:
   # Current repository references are already rotated.
@@ -27,8 +31,8 @@ references:
   plastid: "{project_dir}/references/Col_plastid.fa"
 
 draft_edited:
-  mito: "{results_dir}/{sample}/draft_assembly/mito/all_mito_500K_after_rr.edited.fasta"
-  plastid: "{results_dir}/{sample}/draft_assembly/plastid/all_plastid_150K_after_rr.edited.fasta"
+  mito: "{results_dir}/{sample}/draft_assembly/mito/mito_checked_draft.fasta"
+  plastid: "{results_dir}/{sample}/draft_assembly/plastid/plastid_checked_draft.fasta"
 
 run2:
   name: run_2

@@ -14,6 +14,7 @@ import numpy as np
 from collections import OrderedDict
 import sys
 import os
+import shutil
 import time
 
 # Function purity marker. "pure" means deterministic from explicit inputs with
@@ -27,6 +28,7 @@ FUNCTION_PURITY = {
     "rotate_fasta": "impure",
     "mecat_cns": "impure",
     "flye_assemble": "impure",
+    "simple_draft_asm": "impure",
     "flye_polish": "impure",
     "aln_to_ref": "impure",
     "get_flipped_fasta": "impure",
@@ -283,6 +285,7 @@ def rotate_fasta(genome_fasta_path, rotated_fasta_path, step):
 
 
 def mecat_cns(genome, genome_size, reads, soft_paths_dict, threads):
+    command_0 = "rm -rf mecat_" + genome + "_" + str(genome_size) + " " + genome + "_" + str(genome_size) + "_config.txt"
     command_1 = soft_paths_dict.get("mecat") + " config " + genome + "_" + str(genome_size) + "_config.txt"
     command_2 = "sed s/PROJECT=/PROJECT=mecat_" + genome + "_" + str(genome_size) + "/ " + genome + "_" + str(genome_size) + "_config.txt > new_config && mv new_config " + genome + "_" + str(genome_size) + "_config.txt"
     command_3 = "sed s/RAWREADS=/RAWREADS=" + reads + "/ " + genome + "_" + str(genome_size) + "_config.txt > new_config && mv new_config " + genome + "_" + str(genome_size) + "_config.txt"
@@ -291,7 +294,7 @@ def mecat_cns(genome, genome_size, reads, soft_paths_dict, threads):
     command_6 = soft_paths_dict.get("mecat") + " correct " + genome + "_" + str(genome_size) + "_config.txt"
     command_7 = "cp mecat_" + genome + "_" + str(genome_size) + "/1-consensus/cns_final.fasta mecat_" + genome + "_" + str(genome_size) + ".fasta"
     command_8 = "rm -rf mecat_" + genome + "_" + str(genome_size) + " mecat_" + genome + "_" + str(genome_size) + "_config.txt"
-    commands = command_1 + " && " + command_2 + " && " + command_3 + " && " + command_4 + " && " + command_5 + " && " + command_6 + " && " + command_7 + " && " + command_8
+    commands = command_0 + " && " + command_1 + " && " + command_2 + " && " + command_3 + " && " + command_4 + " && " + command_5 + " && " + command_6 + " && " + command_7 + " && " + command_8
     hfbase.run_checked(commands)
     return
 
@@ -320,6 +323,36 @@ def flye_assemble(prefix, genome, genome_size, reads, soft_paths_dict, sample_pl
     commands = command_1 + " && " + command_2 + " && " + command_3 + " && " + command_4
     hfbase.run_checked(commands)
     return
+
+
+def simple_draft_asm(genome, genome_size, preset, reads, soft_paths_dict, threads):
+    output_prefix = "simple_draft_asm_" + genome + "_" + str(genome_size) + "K_" + preset
+    output_dir = output_prefix + "_work"
+    output_gfa = output_prefix + ".gfa"
+    simple_draft_asm_bin = soft_paths_dict.get("simple_draft_asm", "simple_draft_asm")
+    hfbase.run_checked("rm -rf " + output_dir + " " + output_gfa)
+    command_1 = simple_draft_asm_bin + " -p " + preset + " -i " + reads + " -o " + output_dir + " -t " + threads
+    hfbase.run_checked(command_1)
+    graph_gfa = os.path.join(output_dir, "graph.gfa")
+    if not os.path.exists(graph_gfa):
+        subset_graphs = []
+        for name in os.listdir(output_dir):
+            if not name.startswith("read_subset_"):
+                continue
+            subset_graph = os.path.join(output_dir, name, "graph.gfa")
+            if os.path.exists(subset_graph):
+                try:
+                    subset_size = int(name.rsplit("_", 1)[1])
+                except ValueError:
+                    subset_size = 0
+                subset_graphs.append((subset_size, subset_graph))
+        if subset_graphs:
+            graph_gfa = sorted(subset_graphs)[-1][1]
+    if not os.path.exists(graph_gfa):
+        raise FileNotFoundError("simple_draft_asm did not produce graph.gfa for preset " + preset)
+    shutil.copyfile(graph_gfa, output_gfa)
+    hfbase.run_checked("rm -rf " + output_dir)
+    return output_gfa
 
 
 def flye_polish(genome, before_fasta_path, after_fasta_prefix, reads, soft_paths_dict, sample_platform, threads, correction=True):

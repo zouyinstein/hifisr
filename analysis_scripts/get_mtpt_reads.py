@@ -50,28 +50,36 @@ os.chdir("reads")
 # split the reads into mito and plastid reads
 hfref.replace_fasta_id("mito", mito_absolute_path, "mito.fa")
 hfref.replace_fasta_id("plastid", plastid_absolute_path, "plastid.fa")
+split_prefix = "split_mtpt"
 if reads_absolute_path.endswith(".gz"):
-    command_1 = "ln -sf " + reads_absolute_path + " " + sample_index + ".fastq.gz"
-    ret = hfbase.get_cli_output_lines(command_1, side_effect = True)
-    hfreads.split_mtpt_reads(sample_index, sample_index + ".fastq.gz", "HiFi", "mito.fa", "plastid.fa", soft_paths_dict, threads)
-    # get the stats of the reads with plots
-    id_length_qual_file, total_read_number, total_bases = hfrps.get_fastq_stats("all", sample_index + ".fastq.gz", soft_paths_dict, threads)
-    hfrps.plot_length_qual("all", "HiFi", id_length_qual_file, total_read_number, total_bases)
+    raw_reads_link = "all.fastq.gz"
 else:
-    command_1 = "ln -sf " + reads_absolute_path + " " + sample_index + ".fastq"
-    ret = hfbase.get_cli_output_lines(command_1, side_effect = True)
-    hfreads.split_mtpt_reads(sample_index, sample_index + ".fastq", "HiFi", "mito.fa", "plastid.fa", soft_paths_dict, threads)
-    # get the stats of the reads with plots
-    id_length_qual_file, total_read_number, total_bases = hfrps.get_fastq_stats("all", sample_index + ".fastq", soft_paths_dict, threads)
-    hfrps.plot_length_qual("all", "HiFi", id_length_qual_file, total_read_number, total_bases)
-    
-id_length_qual_file, total_read_number, total_bases = hfrps.get_fastq_stats("mito", sample_index + "_mito.fastq", soft_paths_dict, threads)
+    raw_reads_link = "all.fastq"
+cleanup_files = [
+    "all.fastq", "all.fastq.gz",
+    "mito.fastq", "mito.fastq.gz",
+    "plastid.fastq", "plastid.fastq.gz",
+    split_prefix + "_mito.fastq", split_prefix + "_plastid.fastq",
+    sample_index + ".fastq", sample_index + ".fastq.gz",
+    sample_index + "_mito.fastq", sample_index + "_mito.fastq.gz",
+    sample_index + "_plastid.fastq", sample_index + "_plastid.fastq.gz",
+]
+hfbase.run_checked("rm -f " + " ".join(cleanup_files))
+command_1 = "ln -sf " + reads_absolute_path + " " + raw_reads_link
+hfbase.get_cli_output_lines(command_1, side_effect = True)
+hfreads.split_mtpt_reads(split_prefix, raw_reads_link, "HiFi", "mito.fa", "plastid.fa", soft_paths_dict, threads)
+os.replace(split_prefix + "_mito.fastq", "mito.fastq")
+os.replace(split_prefix + "_plastid.fastq", "plastid.fastq")
+
+id_length_qual_file, total_read_number, total_bases = hfrps.get_fastq_stats("all", raw_reads_link, soft_paths_dict, threads)
+hfrps.plot_length_qual("all", "HiFi", id_length_qual_file, total_read_number, total_bases)
+id_length_qual_file, total_read_number, total_bases = hfrps.get_fastq_stats("mito", "mito.fastq", soft_paths_dict, threads)
 hfrps.plot_length_qual("mito", "HiFi", id_length_qual_file, total_read_number, total_bases)
-id_length_qual_file, total_read_number, total_bases = hfrps.get_fastq_stats("plastid", sample_index + "_plastid.fastq", soft_paths_dict, threads)
+id_length_qual_file, total_read_number, total_bases = hfrps.get_fastq_stats("plastid", "plastid.fastq", soft_paths_dict, threads)
 hfrps.plot_length_qual("plastid", "HiFi", id_length_qual_file, total_read_number, total_bases)
 
 pigz = soft_paths_dict.get("pigz", "pigz")
-command_1 = pigz + " -p " + threads + " -f " + sample_index + "_mito.fastq " + sample_index + "_plastid.fastq"
+command_1 = pigz + " -p " + threads + " -f mito.fastq plastid.fastq"
 hfbase.get_cli_output_lines(command_1, side_effect = True)
 
 os.chdir("../..")
