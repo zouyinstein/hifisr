@@ -64,7 +64,8 @@ if not os.path.exists(genome):
 os.chdir(genome)
 
 # add sample_index
-command_1 = "ln -sf " + reads_absolute_path + " reads.fastq"
+reads_link = "reads.fastq.gz" if reads_absolute_path.endswith(".gz") else "reads.fastq"
+command_1 = "rm -f reads.fastq reads.fastq.gz && ln -sf " + reads_absolute_path + " " + reads_link
 hfbase.run_checked(command_1)
 if genome == "plastid":
     genome_size = 150
@@ -74,10 +75,10 @@ else:
     print("Unsupported genome: " + genome, file=sys.stderr)
     sys.exit(1)
 
-hfref.mecat_cns(genome, genome_size, "reads.fastq", soft_paths_dict, threads)
+hfref.mecat_cns(genome, genome_size, reads_link, soft_paths_dict, threads)
 hfref.flye_assemble("mecat", genome, genome_size, "mecat_" + genome + "_" + str(genome_size) + ".fasta", soft_paths_dict, "HiFi", threads, correction=True)
-# convert reads.fastq to fasta using seqkit
-command_2 = soft_paths_dict.get("seqkit") + " fq2fa reads.fastq -o reads.fasta -j " + threads
+# convert sampled reads to fasta using seqkit
+command_2 = soft_paths_dict.get("seqkit") + " fq2fa " + reads_link + " -o reads.fasta -j " + threads
 hfbase.run_checked(command_2)
 hfref.flye_assemble("all", genome, genome_size, "reads.fasta", soft_paths_dict, "HiFi", threads, correction=False)
 hfrps.get_gfa_blastn_png(genome_absolute_path, soft_paths_dict)

@@ -13,6 +13,7 @@ import hifisr_functions.base as hfbase
 import hifisr_functions.reads as hfreads
 import hifisr_functions.reports as hfrps
 import os
+import shutil
 
 
 # Usage:
@@ -24,7 +25,9 @@ soft_paths_dict = hfbase.load_soft_paths(soft_paths_file)
 sample_index = sys.argv[2] # ATHiFi001
 genome = sys.argv[3] # mito
 id_length_qual_file = sys.argv[4] # filt_L10K_mito_id_length_qual.txt, 
-sample_num = int(sys.argv[5]) # 4000
+sample_num = int(sys.argv[5]) if len(sys.argv) > 5 else 10000
+threads = sys.argv[6] if len(sys.argv) > 6 else "1"
+sample_prefix = "sample_" + genome
 
 
 # create project folder by sample_index
@@ -36,17 +39,27 @@ if not os.path.exists("reads"):
 os.chdir("reads")
 
 # random sampling the reads with sample_num
-id_length_qual_file_sampled, sample_read_number, sample_bases = hfreads.random_sampling("sample_" + str(sample_num) + "_" + genome, id_length_qual_file, sample_number=sample_num)
-hfrps.plot_length_qual("sample_" + str(sample_num) + "_" + genome, "HiFi", id_length_qual_file_sampled, sample_read_number, sample_bases)
+id_length_qual_file_sampled, sample_read_number, sample_bases = hfreads.random_sampling(sample_prefix, id_length_qual_file, sample_number=sample_num)
+hfrps.plot_length_qual(sample_prefix, "HiFi", id_length_qual_file_sampled, sample_read_number, sample_bases)
 
 # move the sampled reads to sample_reads
 if not os.path.exists("sample_reads"):
     os.makedirs("sample_reads")
-command_1 = "mv sample*.* sample_reads"
-hfbase.get_cli_output_lines(command_1, side_effect = True)
+for filename in [
+    id_length_qual_file_sampled,
+    sample_prefix + "_length_qual_distribution.pdf",
+    sample_prefix + "_length_qual_2d_distribution.pdf",
+]:
+    if os.path.exists(filename):
+        shutil.move(filename, os.path.join("sample_reads", filename))
 
 # extract the ids of the sampled reads and extract the reads
-ids_file = "sample_reads/sample_" + str(sample_num) + "_" + genome + "_ids.txt"
+ids_file = "sample_reads/" + sample_prefix + "_ids.txt"
+sample_id_length_qual_file = "sample_reads/" + sample_prefix + "_id_length_qual.txt"
+sample_fastq_file = "sample_reads/" + sample_prefix + ".fastq.gz"
+sample_fastq_file_uncompressed = "sample_reads/" + sample_prefix + ".fastq"
+if os.path.exists(sample_fastq_file_uncompressed):
+    os.remove(sample_fastq_file_uncompressed)
 fastq_file = sample_index + "_" + genome + ".fastq"
 if os.path.exists(fastq_file + ".gz"):
     fastq_file = fastq_file + ".gz"
@@ -54,8 +67,9 @@ elif not os.path.exists(fastq_file):
     print("Cannot find " + fastq_file + " or " + fastq_file + ".gz", file=sys.stderr)
     sys.exit(1)
 
-command_2 = "cut -f 1 sample_reads/sample_" + str(sample_num) + "_" + genome + "_id_length_qual.txt > " + ids_file
-command_3 = soft_paths_dict.get("seqkit") + " grep -f " + ids_file + " " + fastq_file + " > sample_reads/sample_" + str(sample_num) + "_" + genome + ".fastq"
+pigz = soft_paths_dict.get("pigz", "pigz")
+command_2 = "cut -f 1 " + sample_id_length_qual_file + " > " + ids_file
+command_3 = soft_paths_dict.get("seqkit") + " grep -f " + ids_file + " " + fastq_file + " | " + pigz + " -p " + threads + " -c > " + sample_fastq_file
 hfbase.get_cli_output_lines(command_2 + " && " + command_3, side_effect = True)
 
 os.chdir("../..")

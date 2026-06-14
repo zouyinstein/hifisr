@@ -19,7 +19,7 @@ from Bio import SeqIO
 import os
 
 
-# Usage: python get_variants_in_reads.py soft_paths.txt ATHiFi001 mito run_1 /path/to/ref/mito_rotated.fasta /path/to/reads/sample_4000_mito.fastq 32
+# Usage: python get_variants_in_reads.py soft_paths.txt ATHiFi001 mito run_1 /path/to/ref/mito_rotated.fasta /path/to/reads/sample_mito.fastq.gz 32
 # Load the soft paths
 soft_paths_file = sys.argv[1] 
 soft_paths_dict = hfbase.load_soft_paths(soft_paths_file)

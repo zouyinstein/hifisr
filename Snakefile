@@ -95,6 +95,7 @@ THREADS_READS = int(THREADS.get("reads", 8))
 THREADS_DRAFT = int(THREADS.get("draft", 8))
 THREADS_POLISH = int(THREADS.get("polish", 8))
 THREADS_VARIANTS = int(THREADS.get("variants", 8))
+SAMPLE_READ_COUNT = int(config.get("sample_read_count", 10000))
 
 REF_CFG = config.get("references", {})
 ROTATE_REFS = bool(REF_CFG.get("rotate", False))
@@ -161,7 +162,7 @@ def genome_reads(genome):
 
 
 def sample_reads(genome):
-    return str(reads_dir() / "sample_reads" / f"sample_4000_{genome}.fastq")
+    return str(reads_dir() / "sample_reads" / f"sample_{genome}.fastq.gz")
 
 
 def filt_id_qual(genome):
@@ -299,7 +300,7 @@ rule references_ready:
 rule reads_ready:
     input:
         expand(str(reads_dir() / "{sample}_{genome}.fastq.gz"), sample=[SAMPLE], genome=GENOMES),
-        expand(str(reads_dir() / "sample_reads" / "sample_4000_{genome}.fastq"), genome=GENOMES)
+        expand(str(reads_dir() / "sample_reads" / "sample_{genome}.fastq.gz"), genome=GENOMES)
 
 
 rule draft_for_manual_edit:
@@ -468,8 +469,9 @@ rule sample_reads:
         id_qual=lambda wc: filt_id_qual(wc.genome),
         genome_fastq=lambda wc: genome_reads(wc.genome)
     output:
-        fastq=str(reads_dir() / "sample_reads" / "sample_4000_{genome}.fastq"),
-        id_qual=str(reads_dir() / "sample_reads" / "sample_4000_{genome}_id_length_qual.txt")
+        fastq=str(reads_dir() / "sample_reads" / "sample_{genome}.fastq.gz"),
+        id_qual=str(reads_dir() / "sample_reads" / "sample_{genome}_id_length_qual.txt")
+    threads: THREADS_READS
     params:
         env=common_env(),
         script=str(SCRIPT_DIR / "sample_reads.py")
@@ -481,7 +483,7 @@ rule sample_reads:
         {RUNTIME_DIRS}
         cd "{RESULTS_DIR}"
         "{input.python}" "{params.script}" "{input.soft_paths}" "{SAMPLE}" "{wildcards.genome}" \
-          "{input.id_qual}" 4000 \
+          "{input.id_qual}" "{SAMPLE_READ_COUNT}" "{threads}" \
           > "{log}" 2>&1
         """
 

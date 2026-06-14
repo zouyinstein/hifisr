@@ -298,7 +298,7 @@ files, `pos_ref_alt.txt`, small read-statistics files, and logs.
 It removes large regenerable FASTQ/FASTA intermediates:
 
 - `results/{sample}/reads/{sample}_{genome}.fastq.gz`
-- `results/{sample}/reads/sample_reads/sample_4000_{genome}.fastq`
+- `results/{sample}/reads/sample_reads/sample_{genome}.fastq.gz`
 - `results/{sample}/{genome}/{run}/reads.fasta`
 - `results/{sample}/{genome}/{run}/new_reads.fasta`
 - `results/{sample}/{genome}/{run}/FL.fasta`

@@ -18,6 +18,8 @@ threads:
   polish: 8
   variants: 8
 
+sample_read_count: 10000
+
 references:
   # Current repository references are already rotated.
   rotate: false

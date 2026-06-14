@@ -173,12 +173,20 @@ def correct_reads_by_canu(sample_index, genome, bait_ref, sample_num, sample_pla
             "mito": "500k",
             "plastid": "150k",
     }
-    command_1 = soft_paths_dict.get("canu") + " -correct -p " + sample_index + "_" + genome + "  -d " + genome + "_canu genomeSize=" + canu_genome_size_dict.get(genome) + " " + canu_platform_dict.get(sample_platform) + " sample_reads/sample_" + str(sample_num) + "_" + genome + ".fastq maxThreads=" + threads + " maxMemory=" + canu_memory + " useGrid=0 corOutCoverage=" + canu_outcoverage_dict.get(genome)
+    sample_reads_file = "sample_reads/sample_" + genome + ".fastq.gz"
+    legacy_sample_reads_file = "sample_reads/sample_" + str(sample_num) + "_" + genome + ".fastq"
+    legacy_sample_reads_file_gz = legacy_sample_reads_file + ".gz"
+    if not os.path.exists(sample_reads_file):
+        if os.path.exists(legacy_sample_reads_file_gz):
+            sample_reads_file = legacy_sample_reads_file_gz
+        else:
+            sample_reads_file = legacy_sample_reads_file
+    command_1 = soft_paths_dict.get("canu") + " -correct -p " + sample_index + "_" + genome + "  -d " + genome + "_canu genomeSize=" + canu_genome_size_dict.get(genome) + " " + canu_platform_dict.get(sample_platform) + " " + sample_reads_file + " maxThreads=" + threads + " maxMemory=" + canu_memory + " useGrid=0 corOutCoverage=" + canu_outcoverage_dict.get(genome)
     command_2 = "mv " + genome + "_canu/" + sample_index + "_" + genome + ".correctedReads.fasta.gz " + result_dir + "/" + sample_index + "_" + genome + ".correctedReads.fasta.gz"
     command_3 = "rm -r " + genome + "_canu"
     hfbase.get_cli_output_lines(command_1 + " && " + command_2 + " && " + command_3, side_effect = True)
     # evaluate error rate against the given reference
-    command_4 = soft_paths_dict.get("minimap2") + " -t " + threads + " -ax " + minimap2_platform_dict.get(sample_platform) + " " + bait_ref + " sample_reads/sample_" + str(sample_num) + "_" + genome + ".fastq | " + soft_paths_dict.get("samtools") + " view -bS - | " + soft_paths_dict.get("samtools") + " sort -o " + genome + "_raw.bam"
+    command_4 = soft_paths_dict.get("minimap2") + " -t " + threads + " -ax " + minimap2_platform_dict.get(sample_platform) + " " + bait_ref + " " + sample_reads_file + " | " + soft_paths_dict.get("samtools") + " view -bS - | " + soft_paths_dict.get("samtools") + " sort -o " + genome + "_raw.bam"
     command_5 = soft_paths_dict.get("samtools") + " index " + genome + "_raw.bam"
     command_6 = soft_paths_dict.get("minimap2") + " -t " + threads + " -ax " + minimap2_platform_dict.get(sample_platform) + " " + bait_ref + " " + result_dir + "/" + sample_index + "_" + genome + ".correctedReads.fasta.gz | " + soft_paths_dict.get("samtools") + " view -bS - | " + soft_paths_dict.get("samtools") + " sort -o " + genome + "_corrected.bam"
     command_7 = soft_paths_dict.get("samtools") + " index " + genome + "_corrected.bam"

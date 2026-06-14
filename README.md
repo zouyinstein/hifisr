@@ -353,8 +353,8 @@ files, `pos_ref_alt.txt`, small read-statistics files, and logs.
 It deletes only the following regenerable files and directories under
 `results/`:
 
-- `results/{sample}/reads/{sample}_{genome}.fastq`
-- `results/{sample}/reads/sample_reads/sample_4000_{genome}.fastq`
+- `results/{sample}/reads/{sample}_{genome}.fastq.gz`
+- `results/{sample}/reads/sample_reads/sample_{genome}.fastq.gz`
 - `results/{sample}/{genome}/{run}/reads.fasta`
 - `results/{sample}/{genome}/{run}/new_reads.fasta`
 - `results/{sample}/{genome}/{run}/FL.fasta`
@@ -558,13 +558,13 @@ python get_mtpt_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi
 # filter the reads: remove reads shorter than 10 kb
 python filt_read_ids.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi001 mito_id_length_qual.txt plastid_id_length_qual.txt 10000 0
 
-# random sampling of 4000 reads for mitochondrial and plastid genomes, respectively
-python sample_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi001 mito filt_L10K_mito_id_length_qual.txt 4000
-python sample_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi001 plastid filt_L10K_plastid_id_length_qual.txt 4000
+# random sampling of 10000 reads for mitochondrial and plastid genomes, respectively
+python sample_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi001 mito filt_L10K_mito_id_length_qual.txt 10000 32
+python sample_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi001 plastid filt_L10K_plastid_id_length_qual.txt 10000 32
 
 # Estimation of variant frequencies
-python get_variants_in_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi001 mito run_1 /mnt/software/scripts/results/mito_rotated_293434.fasta /mnt/software/scripts/results/ATHiFi001/reads/sample_reads/sample_4000_mito.fastq 32
-python get_variants_in_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi001 plastid run_1 /mnt/software/scripts/results/plastid_rotated_61049.fasta /mnt/software/scripts/results/ATHiFi001/reads/sample_reads/sample_4000_plastid.fastq 32
+python get_variants_in_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi001 mito run_1 /mnt/software/scripts/results/mito_rotated_293434.fasta /mnt/software/scripts/results/ATHiFi001/reads/sample_reads/sample_mito.fastq.gz 32
+python get_variants_in_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt ATHiFi001 plastid run_1 /mnt/software/scripts/results/plastid_rotated_61049.fasta /mnt/software/scripts/results/ATHiFi001/reads/sample_reads/sample_plastid.fastq.gz 32
 ```
 
 | mitochondria                                        | plastid                                                |
@@ -609,10 +609,10 @@ python get_mtpt_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt Ambore
 python filt_read_ids.py /mnt/software/scripts/hifisr/deps/soft_paths.txt Amborella_1 mito_id_length_qual.txt plastid_id_length_qual.txt 10000 0
 
 # random sampling of 10000 reads for mt genome
-python sample_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt Amborella_1 mito filt_L10K_mito_id_length_qual.txt 10000
+python sample_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt Amborella_1 mito filt_L10K_mito_id_length_qual.txt 10000 32
 
 # get the draft assembly
-python get_draft_assembly.py /mnt/software/scripts/hifisr/deps/soft_paths.txt Amborella_1 mito mt_all.fasta sample_10000_mito.fastq 20
+python get_draft_assembly.py /mnt/software/scripts/hifisr/deps/soft_paths.txt Amborella_1 mito mt_all.fasta /mnt/software/scripts/results/Amborella_1/reads/sample_reads/sample_mito.fastq.gz 20
 ```
 
 | MECAT2 + metaFlye                      | metaFlye                             |
@@ -625,7 +625,7 @@ python get_draft_assembly.py /mnt/software/scripts/hifisr/deps/soft_paths.txt Am
 ```bash
 # Manually resolve the graph in Bandage, and save the results as draft.fasta
 # Split the reads by contig
-python get_reads_by_contig.py /mnt/software/scripts/hifisr/deps/soft_paths.txt Amborella_1 mt_draft_contigs draft.fasta sample_10000_mito.fastq 32
+python get_reads_by_contig.py /mnt/software/scripts/hifisr/deps/soft_paths.txt Amborella_1 mt_draft_contigs draft.fasta /mnt/software/scripts/results/Amborella_1/reads/sample_reads/sample_mito.fastq.gz 32
 
 # Check the correctness of the contigs by calling and calculating variant frequencies
 python get_variants_in_reads.py /mnt/software/scripts/hifisr/deps/soft_paths.txt Amborella_1 mito contig_1 contigs.part_contig_1.fa contig_1.fastq 32
