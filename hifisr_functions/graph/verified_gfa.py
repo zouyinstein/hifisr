@@ -996,7 +996,30 @@ def load_fl_whole_read_evidence(run_dir):
     }
 
 
-def anchor_observations_for_read(alignments, anchors, min_anchor_overlap):
+def orient_matches(left, right):
+    return left in "+-" and right in "+-" and left == right
+
+
+def orient_relative_to_anchor(alignment_strand, anchor_strand):
+    if alignment_strand not in "+-" or anchor_strand not in "+-":
+        return "."
+    return "+" if alignment_strand == anchor_strand else "-"
+
+
+def orient_relative_to_path(alignment_strand, anchor_strand, path_orient):
+    # Raw read-vs-reference strand is not comparable across inverted repeat copies.
+    node_orient = orient_relative_to_anchor(alignment_strand, anchor_strand)
+    if node_orient == "." or path_orient not in "+-":
+        return "."
+    return "+" if node_orient == path_orient else "-"
+
+
+def anchor_observations_for_read(
+    alignments,
+    anchors,
+    min_anchor_overlap,
+    path_orient=None,
+):
     observations = []
     for anchor in anchors:
         for alignment in alignments:
@@ -1019,6 +1042,16 @@ def anchor_observations_for_read(alignments, anchors, min_anchor_overlap):
             observations.append({
                 "anchor_id": anchor["anchor_id"],
                 "strand": alignment.strand,
+                "anchor_strand": anchor.get("strand", "."),
+                "path_strand": (
+                    orient_relative_to_path(
+                        alignment.strand,
+                        anchor.get("strand", "."),
+                        path_orient,
+                    )
+                    if path_orient is not None
+                    else "."
+                ),
                 "query_mid": (query_a + query_b) / 2,
                 "query_start": min(query_a, query_b),
                 "query_end": max(query_a, query_b),
@@ -1030,20 +1063,45 @@ def anchor_observations_for_read(alignments, anchors, min_anchor_overlap):
 
 
 def find_candidate_read_support(alignments, candidate, min_anchor_overlap):
-    left_obs = anchor_observations_for_read(alignments, candidate["left_anchors"], min_anchor_overlap)
-    repeat_obs = anchor_observations_for_read(alignments, candidate["repeat_anchors"], min_anchor_overlap)
-    right_obs = anchor_observations_for_read(alignments, candidate["right_anchors"], min_anchor_overlap)
+    left_endpoint = _split_gfa_endpoint(candidate["left_endpoint"])
+    right_endpoint = _split_gfa_endpoint(candidate["right_endpoint"])
+    left_path_orient = left_endpoint[1] if left_endpoint is not None else None
+    right_path_orient = (
+        flip_orient(right_endpoint[1]) if right_endpoint is not None else None
+    )
+    left_obs = anchor_observations_for_read(
+        alignments,
+        candidate["left_anchors"],
+        min_anchor_overlap,
+        path_orient=left_path_orient,
+    )
+    repeat_obs = anchor_observations_for_read(
+        alignments,
+        candidate["repeat_anchors"],
+        min_anchor_overlap,
+        path_orient="+",
+    )
+    right_obs = anchor_observations_for_read(
+        alignments,
+        candidate["right_anchors"],
+        min_anchor_overlap,
+        path_orient=right_path_orient,
+    )
     best = None
     for left in left_obs:
         for repeat in repeat_obs:
-            if left["strand"] != repeat["strand"]:
+            if not orient_matches(left["path_strand"], repeat["path_strand"]):
                 continue
             for right in right_obs:
-                if repeat["strand"] != right["strand"]:
+                if not orient_matches(repeat["path_strand"], right["path_strand"]):
                     continue
                 if left["query_mid"] < repeat["query_mid"] < right["query_mid"]:
+                    if repeat["path_strand"] != "+":
+                        continue
                     orientation = "left_to_right"
                 elif right["query_mid"] < repeat["query_mid"] < left["query_mid"]:
+                    if repeat["path_strand"] != "-":
+                        continue
                     orientation = "right_to_left"
                 else:
                     continue
@@ -1059,7 +1117,8 @@ def find_candidate_read_support(alignments, candidate, min_anchor_overlap):
                     "left_anchor": left["anchor_id"],
                     "repeat_anchor": repeat["anchor_id"],
                     "right_anchor": right["anchor_id"],
-                    "strand": left["strand"],
+                    "strand": repeat["strand"],
+                    "path_strand": repeat["path_strand"],
                 }
                 if best is None or (item["score"], item["query_span"]) > (best["score"], best["query_span"]):
                     best = item

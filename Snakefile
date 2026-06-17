@@ -334,6 +334,11 @@ def verified_gfa_run_done(genome):
     return polish_alignment_variant_done(genome)
 
 
+def verified_gfa_variant_table(genome, filtered=False):
+    filename = "variants_anno_combined_depth_frq_filter.xlsx" if filtered else "variants_anno_combined_depth_frq.xlsx"
+    return str(sample_dir() / genome / verified_gfa_run_name(genome) / filename)
+
+
 def verified_gfa_fasta(genome):
     if genome in RUN3_GENOMES:
         return corrected_genome_fasta(genome)
@@ -357,6 +362,11 @@ def verified_gfa_outputs(genome):
         str(d / f"verified_{genome}.auto_repeat_resolved.pdf"),
         str(d / "gfa_image_export_protocol.tsv"),
         str(d / "verified_gfa_build_manifest.tsv"),
+        str(d / f"verified_{genome}_by_nodes.fasta"),
+        str(d / f"verified_{genome}_linear_to_node_coordinate.tsv"),
+        str(d / "coordinate_consistency.tsv"),
+        str(d / "variant_by_nodes" / "variants_anno_combined_depth_frq.by_verified_node.xlsx"),
+        str(d / "variant_by_nodes" / "variants_anno_combined_depth_frq_filter.by_verified_node.xlsx"),
     ]
 
 
@@ -792,7 +802,9 @@ rule build_verified_gfa_read_support:
         raw_gfa=lambda wc: edited_draft_input(wc.genome),
         verified_fasta=lambda wc: verified_gfa_fasta(wc.genome),
         run_done=lambda wc: verified_gfa_run_done(wc.genome),
-        image_ref=lambda wc: ref_for_workflow(wc.genome)
+        image_ref=lambda wc: ref_for_workflow(wc.genome),
+        variant_table=lambda wc: verified_gfa_variant_table(wc.genome, filtered=False),
+        variant_filter_table=lambda wc: verified_gfa_variant_table(wc.genome, filtered=True)
     output:
         unmerged_gfa=str(sample_dir() / "draft_assembly" / "{genome}" / "verified_gfa_read_support" / "unmerged_{genome}_raw.gfa"),
         unmerged_pdf=str(sample_dir() / "draft_assembly" / "{genome}" / "verified_gfa_read_support" / "unmerged_{genome}_raw.pdf"),
@@ -803,13 +815,19 @@ rule build_verified_gfa_read_support:
         auto_resolved_gfa=str(sample_dir() / "draft_assembly" / "{genome}" / "verified_gfa_read_support" / "verified_{genome}.auto_repeat_resolved.gfa"),
         auto_resolved_pdf=str(sample_dir() / "draft_assembly" / "{genome}" / "verified_gfa_read_support" / "verified_{genome}.auto_repeat_resolved.pdf"),
         protocol=str(sample_dir() / "draft_assembly" / "{genome}" / "verified_gfa_read_support" / "gfa_image_export_protocol.tsv"),
-        manifest=str(sample_dir() / "draft_assembly" / "{genome}" / "verified_gfa_read_support" / "verified_gfa_build_manifest.tsv")
+        manifest=str(sample_dir() / "draft_assembly" / "{genome}" / "verified_gfa_read_support" / "verified_gfa_build_manifest.tsv"),
+        by_nodes_fasta=str(sample_dir() / "draft_assembly" / "{genome}" / "verified_gfa_read_support" / "verified_{genome}_by_nodes.fasta"),
+        linear_to_node_map=str(sample_dir() / "draft_assembly" / "{genome}" / "verified_gfa_read_support" / "verified_{genome}_linear_to_node_coordinate.tsv"),
+        coordinate_consistency=str(sample_dir() / "draft_assembly" / "{genome}" / "verified_gfa_read_support" / "coordinate_consistency.tsv"),
+        variants_by_node=str(sample_dir() / "draft_assembly" / "{genome}" / "verified_gfa_read_support" / "variant_by_nodes" / "variants_anno_combined_depth_frq.by_verified_node.xlsx"),
+        variants_filter_by_node=str(sample_dir() / "draft_assembly" / "{genome}" / "verified_gfa_read_support" / "variant_by_nodes" / "variants_anno_combined_depth_frq_filter.by_verified_node.xlsx")
     threads: THREADS_VARIANTS
     params:
         env=common_env(),
         run_dir=lambda wc: verified_gfa_run_dir(wc.genome),
         output_dir=lambda wc: str(verified_gfa_dir(wc.genome)),
-        script=str(SCRIPT_DIR / "build_verified_gfa.py")
+        script=str(SCRIPT_DIR / "build_verified_gfa.py"),
+        projection_script=str(SCRIPT_DIR / "project_variants_to_verified_gfa.py")
     log:
         str(LOG_DIR / "build_verified_gfa_read_support.{genome}.log")
     shell:
@@ -821,4 +839,15 @@ rule build_verified_gfa_read_support:
           "{input.raw_gfa}" "{input.verified_fasta}" "{params.run_dir}" "{params.output_dir}" "{threads}" \
           --image-reference-fasta "{input.image_ref}" \
           > "{log}" 2>&1
+        "{input.python}" "{params.projection_script}" \
+          --genome "{wildcards.genome}" \
+          --verified-gfa "{output.verified_gfa}" \
+          --verified-fasta "{params.output_dir}/verified_{wildcards.genome}.fasta" \
+          --node-source-map "{params.output_dir}/verified_node_source_map.tsv" \
+          --linear-fasta "{input.verified_fasta}" \
+          --run-dir "{params.run_dir}" \
+          --output-dir "{params.output_dir}" \
+          --variant-table "{input.variant_table}" \
+          --variant-table "{input.variant_filter_table}" \
+          >> "{log}" 2>&1
         """
