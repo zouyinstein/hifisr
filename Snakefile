@@ -370,6 +370,38 @@ def verified_gfa_outputs(genome):
     ]
 
 
+def compact_report_outputs():
+    d = sample_dir() / "reports"
+    outputs = [
+        str(d / "index.html"),
+        str(d / "project_manifest.json"),
+    ]
+    for genome in [g for g in GENOMES if g in {"mito", "plastid"}]:
+        report_dir = d / genome
+        prefix = f"verified_{genome}"
+        outputs.extend([
+            str(report_dir / "index.html"),
+            str(report_dir / "final" / "final.gfa"),
+            str(report_dir / "final" / "final.fasta"),
+            str(report_dir / "final" / "final_graph.svg"),
+            str(report_dir / "final" / "final_graph.pdf"),
+            str(report_dir / "final" / "final_coverage.png"),
+            str(report_dir / "final" / "final_coverage.pdf"),
+            str(report_dir / "final" / "final_coverage_bubble.png"),
+            str(report_dir / "final" / "final_coverage_bubble.pdf"),
+            str(report_dir / "final" / "final_bubble.png"),
+            str(report_dir / "final" / "final_bubble.pdf"),
+            str(report_dir / "metadata" / "final_summary.tsv"),
+            str(report_dir / "metadata" / "final_manifest.tsv"),
+            str(report_dir / "metadata" / "figure_manifest.tsv"),
+            str(report_dir / "metadata" / "report_collection_status.tsv"),
+            str(report_dir / "metadata" / "report_manifest.json"),
+            str(report_dir / "metadata" / f"{prefix}_linear_to_node_coordinate.tsv"),
+            str(report_dir / "metadata" / "variants_anno_combined_depth_frq_filter.by_verified_node.xlsx"),
+        ])
+    return outputs
+
+
 def draft_outputs(genome):
     size = DRAFT_SIZE[genome]
     d = draft_dir(genome)
@@ -437,11 +469,13 @@ VERIFY_CORRECTED_GENOME_TARGETS = [
 VERIFIED_GFA_TARGETS = [
     output for genome in VERIFIED_GFA_GENOMES for output in verified_gfa_outputs(genome)
 ]
-FINAL_TARGETS = [
+CORE_FINAL_TARGETS = [
     polish_alignment_variant_table(g) for g in GENOMES
 ] + [
     verify_corrected_genome_table(g) for g in RUN3_GENOMES
 ] + VERIFIED_GFA_TARGETS
+REPORT_TARGETS = compact_report_outputs()
+FINAL_TARGETS = CORE_FINAL_TARGETS + REPORT_TARGETS
 
 
 rule all:
@@ -503,6 +537,29 @@ rule verify_corrected_genome:
 rule verified_gfa_read_support:
     input:
         VERIFIED_GFA_TARGETS
+
+
+rule compact_report_bundle:
+    input:
+        core=CORE_FINAL_TARGETS,
+        python=PYTHON,
+        script=str(SCRIPT_DIR / "generate_compact_report_bundle.py"),
+        module=str(PROJECT_ROOT / "hifisr_functions" / "report" / "compact_bundle.py"),
+        version_module=str(PROJECT_ROOT / "hifisr_functions" / "__init__.py")
+    output:
+        REPORT_TARGETS
+    params:
+        env=common_env(),
+        base=str(sample_dir())
+    log:
+        str(LOG_DIR / "generate_compact_report_bundle.log")
+    shell:
+        r"""
+        {params.env}
+        {RUNTIME_DIRS}
+        "{input.python}" "{input.script}" --base "{params.base}" \
+          > "{log}" 2>&1
+        """
 
 
 rule final:

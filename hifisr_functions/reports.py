@@ -8,6 +8,7 @@
 # - reports: read statistics, plots, Excel tables, and report outputs; import hifisr_functions.reports as hfrps
 
 import hifisr_functions.base as hfbase
+import csv
 import numpy as np
 import pandas as pd
 from Bio import SeqIO
@@ -124,10 +125,11 @@ def plot_bubble_type_2_rep_raw(table_file, IDs_dir, ref_fasta):
     alpha_value = 0.5 # df["alpha"] = 0.5
     if len(df) > 0:
         plt.scatter(df['se1'], df['ss2'], s=df['subgroup_count_norm']*size_ratio, c=df['color'], alpha=alpha_value, linewidths=0)
-        plt.grid(True, alpha=0.5)
-        plt.xlim(1, ref_len)
-        plt.ylim(1, ref_len)
-        plt.savefig('bubble_type_2_rep_raw.pdf')
+    plt.grid(True, alpha=0.5)
+    plt.xlim(1, ref_len)
+    plt.ylim(1, ref_len)
+    plt.savefig('bubble_type_2_rep_raw.pdf')
+    plt.savefig('bubble_type_2_rep_raw.png')
     plt.close()
     return
 
@@ -271,6 +273,7 @@ def get_gfa_reference_images(
     soft_paths_dict,
     output_format="pdf",
     renderer="auto",
+    append_protocol=False,
 ):
     settings = OrderedDict(GFA_EDITOR_IMAGE_SETTINGS)
     settings["format"] = output_format
@@ -311,6 +314,9 @@ def get_gfa_reference_images(
             "alignment_args": settings.get("alignment_args", "."),
             "status": "written",
         })
+    if append_protocol and Path("gfa_image_export_protocol.tsv").is_file():
+        with open("gfa_image_export_protocol.tsv", newline="") as handle:
+            rows = list(csv.DictReader(handle, delimiter="\t")) + rows
     _write_gfa_image_protocol("gfa_image_export_protocol.tsv", rows)
     return outputs
 

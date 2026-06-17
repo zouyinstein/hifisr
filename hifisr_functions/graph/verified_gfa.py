@@ -2671,12 +2671,20 @@ def export_verified_gfa_pdfs(output_dir, image_reference_fasta, soft_paths_dict)
     previous_cwd = Path.cwd()
     try:
         os.chdir(output_dir)
-        return hfrps.get_gfa_reference_images(
+        pdf_outputs = hfrps.get_gfa_reference_images(
             str(image_reference_fasta),
             soft_paths_dict,
             output_format="pdf",
             renderer="gfa_editor",
         )
+        svg_outputs = hfrps.get_gfa_reference_images(
+            str(image_reference_fasta),
+            soft_paths_dict,
+            output_format="svg",
+            renderer="gfa_editor",
+            append_protocol=True,
+        )
+        return pdf_outputs + svg_outputs
     finally:
         os.chdir(previous_cwd)
 

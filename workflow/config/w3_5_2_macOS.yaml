@@ -4,7 +4,7 @@ sample: W3-5-2
 project_dir: "{snakefile_dir}"
 results_dir: "{project_dir}/results"
 
-reads: data/W3-5-2.fastq.gz
+reads: /Users/zouyinstein-m4max/Documents/Codex/hifisr-dev/data/W3-5-2.fastq.gz
 
 soft_paths: "{project_dir}/deps/soft_paths_macOS.txt"
 
@@ -29,14 +29,13 @@ draft_assembly:
     - mx
 
 references:
-  # Current repository references are already rotated.
   rotate: false
-  mito: "{project_dir}/references/Col_mito.fa"
-  plastid: "{project_dir}/references/Col_plastid.fa"
+  mito: "{project_dir}/references/mito_rotated_293434.fasta"
+  plastid: "{project_dir}/references/plastid_rotated_61049.fasta"
 
 draft_edited:
-  mito: "{results_dir}/{sample}/draft_assembly/mito/mito_checked_draft.fasta"
-  plastid: "{results_dir}/{sample}/draft_assembly/plastid/plastid_checked_draft.fasta"
+  mito: "{results_dir}/{sample}/draft_assembly/mito/mito_checked_draft.gfa"
+  plastid: "{results_dir}/{sample}/draft_assembly/plastid/plastid_checked_draft.gfa"
 
 run2:
   name: run_2
@@ -49,3 +48,9 @@ run3:
   name: run_3
   genomes:
     - mito
+
+verified_gfa:
+  enabled: true
+  genomes:
+    - mito
+    - plastid
