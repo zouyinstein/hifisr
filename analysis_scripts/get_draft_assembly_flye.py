@@ -56,7 +56,7 @@ if not modes:
     print("No Flye draft assembly modes were selected.", file=sys.stderr)
     sys.exit(1)
 
-required_tools = ["bandage", "flye"]
+required_tools = ["flye"]
 if "mecat_flye" in modes:
     required_tools.append("mecat")
 if "flye" in modes:
@@ -118,7 +118,7 @@ if "flye" in modes:
 
 hfbase.run_checked("rm -f reads.fastq reads.fastq.gz")
 gfa_outputs = list(dict.fromkeys(gfa_outputs))
-hfrps.get_gfa_blastn_png(genome_absolute_path, soft_paths_dict)
-expected_outputs = gfa_outputs + [gfa_file.replace(".gfa", ".png") for gfa_file in gfa_outputs]
+image_outputs = hfrps.get_gfa_reference_pdf(genome_absolute_path, soft_paths_dict)
+expected_outputs = gfa_outputs + image_outputs
 require_outputs(expected_outputs)
 os.chdir("../../..")

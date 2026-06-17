@@ -89,6 +89,12 @@ DRAFT_SIZE = {"mito": "500", "plastid": "150"}
 RUN2 = config.get("run2", {}).get("name", "run_2")
 RUN3 = config.get("run3", {}).get("name", "run_3")
 RUN3_GENOMES = set(config.get("run3", {}).get("genomes", []))
+VERIFIED_GFA_CONFIG = config.get("verified_gfa", {})
+VERIFIED_GFA_ENABLED = bool(VERIFIED_GFA_CONFIG.get("enabled", False))
+VERIFIED_GFA_GENOMES = [
+    genome for genome in VERIFIED_GFA_CONFIG.get("genomes", GENOMES)
+    if genome in GENOMES
+] if VERIFIED_GFA_ENABLED else []
 
 THREADS = config.get("threads", {})
 THREADS_READS = int(THREADS.get("reads", 8))
@@ -224,16 +230,25 @@ def ref_for_workflow(genome):
     return selected_ref(genome)
 
 
-def edited_fasta(genome):
-    default_name = {
-        "mito": "mito_checked_draft.fasta",
-        "plastid": "plastid_checked_draft.fasta",
-    }[genome]
-    primary = Path(_path(DRAFT_EDITED.get(genome, f"{draft_dir(genome)}/{default_name}")))
-    backup = draft_dir(genome) / "backup_info" / primary.name
-    if not primary.exists() and backup.exists():
-        return str(backup)
-    return str(primary)
+def edited_draft_input(genome):
+    configured = DRAFT_EDITED.get(genome)
+    if configured:
+        primary = Path(_path(configured))
+        backup = draft_dir(genome) / "backup_info" / primary.name
+        if not primary.exists() and backup.exists():
+            return str(backup)
+        return str(primary)
+
+    candidates = [
+        draft_dir(genome) / f"{genome}_checked_draft.gfa",
+        draft_dir(genome) / f"{genome}_checked_draft.unmerged.gfa",
+        draft_dir(genome) / f"{genome}_checked_draft.fasta",
+    ]
+    candidates.extend(draft_dir(genome) / "backup_info" / path.name for path in candidates)
+    for path in candidates:
+        if path.exists():
+            return str(path)
+    return str(draft_dir(genome) / f"{genome}_checked_draft.gfa")
 
 
 def pos_ref_alt(genome):
@@ -305,6 +320,46 @@ def verify_corrected_genome_done(genome):
     return str(sample_dir() / genome / RUN3 / ".snakemake.done")
 
 
+def verified_gfa_run_name(genome):
+    return RUN3 if genome in RUN3_GENOMES else RUN2
+
+
+def verified_gfa_run_dir(genome):
+    return str(sample_dir() / genome / verified_gfa_run_name(genome))
+
+
+def verified_gfa_run_done(genome):
+    if genome in RUN3_GENOMES:
+        return verify_corrected_genome_done(genome)
+    return polish_alignment_variant_done(genome)
+
+
+def verified_gfa_fasta(genome):
+    if genome in RUN3_GENOMES:
+        return corrected_genome_fasta(genome)
+    return polish_alignment_variant_aligned(genome)
+
+
+def verified_gfa_dir(genome):
+    return draft_dir(genome) / "verified_gfa_read_support"
+
+
+def verified_gfa_outputs(genome):
+    d = verified_gfa_dir(genome)
+    return [
+        str(d / f"unmerged_{genome}_raw.gfa"),
+        str(d / f"unmerged_{genome}_raw.pdf"),
+        str(d / f"merged_{genome}_raw.gfa"),
+        str(d / f"merged_{genome}_raw.pdf"),
+        str(d / f"verified_{genome}.gfa"),
+        str(d / f"verified_{genome}.pdf"),
+        str(d / f"verified_{genome}.auto_repeat_resolved.gfa"),
+        str(d / f"verified_{genome}.auto_repeat_resolved.pdf"),
+        str(d / "gfa_image_export_protocol.tsv"),
+        str(d / "verified_gfa_build_manifest.tsv"),
+    ]
+
+
 def draft_outputs(genome):
     size = DRAFT_SIZE[genome]
     d = draft_dir(genome)
@@ -314,20 +369,21 @@ def draft_outputs(genome):
         outputs.extend([
             str(d / f"mecat_{genome}_{size}K_before_rr.gfa"),
             str(d / f"mecat_{genome}_{size}K_after_rr.gfa"),
-            str(d / f"mecat_{genome}_{size}K_before_rr.png"),
-            str(d / f"mecat_{genome}_{size}K_after_rr.png"),
+            str(d / f"mecat_{genome}_{size}K_before_rr.pdf"),
+            str(d / f"mecat_{genome}_{size}K_after_rr.pdf"),
         ])
     if "flye" in modes:
         outputs.extend([
             str(d / f"all_{genome}_{size}K_before_rr.gfa"),
             str(d / f"all_{genome}_{size}K_after_rr.gfa"),
-            str(d / f"all_{genome}_{size}K_before_rr.png"),
-            str(d / f"all_{genome}_{size}K_after_rr.png"),
+            str(d / f"all_{genome}_{size}K_before_rr.pdf"),
+            str(d / f"all_{genome}_{size}K_after_rr.pdf"),
         ])
     for mode in modes:
         if mode in SIMPLE_DRAFT_ASSEMBLY_MODES:
             outputs.append(str(d / f"simple_draft_asm_{genome}_{size}K_{mode}.gfa"))
-            outputs.append(str(d / f"simple_draft_asm_{genome}_{size}K_{mode}.png"))
+            outputs.append(str(d / f"simple_draft_asm_{genome}_{size}K_{mode}.pdf"))
+    outputs.append(str(d / "gfa_image_export_protocol.tsv"))
     return outputs
 
 
@@ -368,10 +424,14 @@ for genome in GENOMES:
 VERIFY_CORRECTED_GENOME_TARGETS = [
     verify_corrected_genome_table(g) for g in RUN3_GENOMES
 ] + [verify_corrected_genome_done(g) for g in RUN3_GENOMES]
-FINAL_TARGETS = [
-    verify_corrected_genome_table(g) if g in RUN3_GENOMES else polish_alignment_variant_table(g)
-    for g in GENOMES
+VERIFIED_GFA_TARGETS = [
+    output for genome in VERIFIED_GFA_GENOMES for output in verified_gfa_outputs(genome)
 ]
+FINAL_TARGETS = [
+    polish_alignment_variant_table(g) for g in GENOMES
+] + [
+    verify_corrected_genome_table(g) for g in RUN3_GENOMES
+] + VERIFIED_GFA_TARGETS
 
 
 rule all:
@@ -428,6 +488,11 @@ rule polish_alignment_variant_review_inputs:
 rule verify_corrected_genome:
     input:
         VERIFY_CORRECTED_GENOME_TARGETS
+
+
+rule verified_gfa_read_support:
+    input:
+        VERIFIED_GFA_TARGETS
 
 
 rule final:
@@ -622,7 +687,7 @@ rule polish_alignment:
         soft_paths=SOFT_PATHS,
         python=PYTHON,
         ref=lambda wc: ref_for_workflow(wc.genome),
-        draft=lambda wc: edited_fasta(wc.genome),
+        draft=lambda wc: edited_draft_input(wc.genome),
         reads=lambda wc: genome_reads(wc.genome)
     output:
         aligned=str(sample_dir() / "draft_assembly" / "{genome}" / "{genome}_flye_polish_aligned.fasta"),
@@ -716,5 +781,44 @@ rule verify_corrected_genome_variants:
         cd "{RESULTS_DIR}"
         "{input.python}" "{params.script}" "{input.soft_paths}" "{SAMPLE}" "{wildcards.genome}" "{RUN3}" \
           "{input.ref}" "{input.reads}" "{threads}" \
+          > "{log}" 2>&1
+        """
+
+
+rule build_verified_gfa_read_support:
+    input:
+        soft_paths=SOFT_PATHS,
+        python=PYTHON,
+        raw_gfa=lambda wc: edited_draft_input(wc.genome),
+        verified_fasta=lambda wc: verified_gfa_fasta(wc.genome),
+        run_done=lambda wc: verified_gfa_run_done(wc.genome),
+        image_ref=lambda wc: ref_for_workflow(wc.genome)
+    output:
+        unmerged_gfa=str(sample_dir() / "draft_assembly" / "{genome}" / "verified_gfa_read_support" / "unmerged_{genome}_raw.gfa"),
+        unmerged_pdf=str(sample_dir() / "draft_assembly" / "{genome}" / "verified_gfa_read_support" / "unmerged_{genome}_raw.pdf"),
+        merged_gfa=str(sample_dir() / "draft_assembly" / "{genome}" / "verified_gfa_read_support" / "merged_{genome}_raw.gfa"),
+        merged_pdf=str(sample_dir() / "draft_assembly" / "{genome}" / "verified_gfa_read_support" / "merged_{genome}_raw.pdf"),
+        verified_gfa=str(sample_dir() / "draft_assembly" / "{genome}" / "verified_gfa_read_support" / "verified_{genome}.gfa"),
+        verified_pdf=str(sample_dir() / "draft_assembly" / "{genome}" / "verified_gfa_read_support" / "verified_{genome}.pdf"),
+        auto_resolved_gfa=str(sample_dir() / "draft_assembly" / "{genome}" / "verified_gfa_read_support" / "verified_{genome}.auto_repeat_resolved.gfa"),
+        auto_resolved_pdf=str(sample_dir() / "draft_assembly" / "{genome}" / "verified_gfa_read_support" / "verified_{genome}.auto_repeat_resolved.pdf"),
+        protocol=str(sample_dir() / "draft_assembly" / "{genome}" / "verified_gfa_read_support" / "gfa_image_export_protocol.tsv"),
+        manifest=str(sample_dir() / "draft_assembly" / "{genome}" / "verified_gfa_read_support" / "verified_gfa_build_manifest.tsv")
+    threads: THREADS_VARIANTS
+    params:
+        env=common_env(),
+        run_dir=lambda wc: verified_gfa_run_dir(wc.genome),
+        output_dir=lambda wc: str(verified_gfa_dir(wc.genome)),
+        script=str(SCRIPT_DIR / "build_verified_gfa.py")
+    log:
+        str(LOG_DIR / "build_verified_gfa_read_support.{genome}.log")
+    shell:
+        r"""
+        {params.env}
+        {RUNTIME_DIRS}
+        mkdir -p "{params.output_dir}"
+        "{input.python}" "{params.script}" "{input.soft_paths}" "{wildcards.genome}" \
+          "{input.raw_gfa}" "{input.verified_fasta}" "{params.run_dir}" "{params.output_dir}" "{threads}" \
+          --image-reference-fasta "{input.image_ref}" \
           > "{log}" 2>&1
         """

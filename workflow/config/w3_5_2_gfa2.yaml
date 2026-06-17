@@ -1,0 +1,50 @@
+# macOS local workflow config for rerunning the GFA-based W3-5-2 workflow.
+
+sample: W3-5-2_gfa2
+project_dir: "{snakefile_dir}"
+results_dir: "{project_dir}/results"
+
+reads: /Users/zouyinstein-home/Documents/Codex/hifisr-dev/data/W3-5-2.fastq.gz
+
+soft_paths: "{project_dir}/deps/soft_paths_macOS_office.txt"
+
+genomes:
+  - mito
+  - plastid
+
+threads:
+  reads: 8
+  draft: 8
+  polish: 8
+  variants: 8
+
+downstream_read_limit:
+  mito: 50000
+  plastid: 50000
+
+draft_assembly:
+  modes:
+    - ms
+    - mh
+    - mx
+
+references:
+  rotate: false
+  mito: "{project_dir}/references/mito_rotated_293434.fasta"
+  plastid: "{project_dir}/references/plastid_rotated_61049.fasta"
+
+draft_edited:
+  mito: "{results_dir}/{sample}/draft_assembly/mito/mito_checked_draft.gfa"
+  plastid: "{results_dir}/{sample}/draft_assembly/plastid/plastid_checked_draft.gfa"
+
+run2:
+  name: run_2
+
+pos_ref_alt:
+  mito: "{results_dir}/{sample}/draft_assembly/mito/pos_ref_alt.txt"
+  plastid: "{results_dir}/{sample}/draft_assembly/plastid/pos_ref_alt.txt"
+
+run3:
+  name: run_3
+  genomes:
+    - mito

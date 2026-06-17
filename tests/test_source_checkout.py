@@ -231,15 +231,18 @@ def test_new_architecture_imports_keep_legacy_modules_available():
     assert Path(hfvar.__file__).name == "variants.py"
 
     assert config.load_soft_paths is hfbase.load_soft_paths
+    assert config.REQUIRED_WORKFLOW_TOOL_GROUPS is hfbase.REQUIRED_WORKFLOW_TOOL_GROUPS
     assert io.get_file_lines is hfbase.get_file_lines
     assert runner.run_checked is hfbase.run_checked
     assert coordinate.get_subseq is hfref.get_subseq
     assert evidence_projection.aln_to_ref is hfref.aln_to_ref
     assert gfa.get_gfa_blastn_png is hfrps.get_gfa_blastn_png
+    assert gfa.get_gfa_reference_pdf is hfrps.get_gfa_reference_pdf
     assert path.rotate_ref_to_non_repeat_region is hfref.rotate_ref_to_non_repeat_region
     assert binning.random_sampling is hfreads.random_sampling
     assert recruit.split_mtpt_reads is hfreads.split_mtpt_reads
     assert stats.get_fastq_stats is hfrps.get_fastq_stats
+    assert plots.get_gfa_reference_pdf is hfrps.get_gfa_reference_pdf
     assert plots.plot_coverage is hfrps.plot_coverage
     assert tables.convert_blastn_alignments_to_table is hfrps.convert_blastn_alignments_to_table
     assert numt_nupt.run_transfer_blastn is hftrans.run_transfer_blastn

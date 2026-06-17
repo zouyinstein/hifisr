@@ -12,6 +12,8 @@ import numpy as np
 import pandas as pd
 from Bio import SeqIO
 import os
+from pathlib import Path
+import subprocess
 import tempfile
 
 os.environ.setdefault("MPLCONFIGDIR", os.path.join(tempfile.gettempdir(), "hifisr_matplotlib"))
@@ -32,6 +34,8 @@ FUNCTION_PURITY = {
     "plot_bubble_type_2_rep_raw": "impure",
     "plot_coverage": "impure",
     "get_gfa_blastn_png": "impure",
+    "get_gfa_reference_pdf": "impure",
+    "get_gfa_reference_images": "impure",
     "convert_blastn_alignments_to_table": "impure",
 }
 
@@ -159,10 +163,174 @@ def plot_coverage(cov_file_1, cov_file_2, cov_file_3, start, end, fig_length=12,
     return
 
 
+GFA_EDITOR_IMAGE_SETTINGS = OrderedDict([
+    ("format", "pdf"),
+    ("colour", "blastsolid"),
+    ("layout", "bandage"),
+    ("width", ""),
+    ("height", ""),
+    ("labels", "true"),
+    ("target_role", "subject"),
+    ("alignment_tool", "minimap2"),
+    ("alignment_args", "-x asm5 -c --secondary=yes"),
+])
+
+
+def _soft_path_exists(soft_paths_dict, key):
+    value = soft_paths_dict.get(key)
+    if not value:
+        return False
+    return os.path.exists(value) if os.path.isabs(value) else True
+
+
+def _write_gfa_image_protocol(path, rows):
+    header = [
+        "gfa",
+        "output",
+        "renderer",
+        "format",
+        "query",
+        "colour",
+        "layout",
+        "width",
+        "height",
+        "labels",
+        "target_role",
+        "alignment_tool",
+        "alignment_args",
+        "status",
+    ]
+    with open(path, "wt") as fout:
+        print("\t".join(header), file=fout)
+        for row in rows:
+            print("\t".join(str(row.get(key, ".")) for key in header), file=fout)
+
+
+def _command_for_python_script(path, soft_paths_dict):
+    path = str(path)
+    if not path.endswith(".py"):
+        return [path]
+    script_path = Path(path)
+    local_python = script_path.resolve().parents[1] / ".venv" / "bin" / "python"
+    if local_python.exists():
+        return [str(local_python), path]
+    if os.access(path, os.X_OK):
+        return [path]
+    return [soft_paths_dict.get("python", "python"), path]
+
+
+def _run_gfa_editor_image(gfa_path, output_path, genome_absolute_path, soft_paths_dict, settings):
+    command = _command_for_python_script(soft_paths_dict.get("gfa_editor_cli"), soft_paths_dict) + [
+        "image",
+        str(gfa_path),
+        str(output_path),
+        "--colour",
+        settings["colour"],
+        "--query",
+        genome_absolute_path,
+        "--alignment-tool",
+        settings["alignment_tool"],
+    ]
+    if settings.get("layout"):
+        command.extend(["--layout", settings["layout"]])
+    if settings.get("width") and str(settings["width"]) != "0":
+        command.extend(["--width", settings["width"]])
+    if settings.get("height") and str(settings["height"]) != "0":
+        command.extend(["--height", settings["height"]])
+    if settings.get("target_role"):
+        command.extend(["--target-role", settings["target_role"]])
+    if settings.get("alignment_args"):
+        command.extend(["--alignment-args", settings["alignment_args"]])
+    if settings["labels"] != "true":
+        command.append("--no-labels")
+    completed = subprocess.run(command, capture_output=True, text=True)
+    if completed.returncode != 0:
+        raise RuntimeError(
+            "GFA_Editor image export failed for "
+            + str(gfa_path)
+            + "\n"
+            + completed.stderr
+        )
+
+
+def _run_bandage_image(gfa_path, output_path, genome_absolute_path, soft_paths_dict):
+    command = (
+        soft_paths_dict.get("bandage")
+        + " image "
+        + str(gfa_path)
+        + " "
+        + str(output_path)
+        + " --edgelen 25 --singlearr --depwidth 0.8 --colour blastsolid --query "
+        + genome_absolute_path
+    )
+    hfbase.run_checked(command)
+
+
+def get_gfa_reference_images(
+    genome_absolute_path,
+    soft_paths_dict,
+    output_format="pdf",
+    renderer="auto",
+):
+    settings = OrderedDict(GFA_EDITOR_IMAGE_SETTINGS)
+    settings["format"] = output_format
+    if renderer == "auto":
+        renderer = "gfa_editor" if _soft_path_exists(soft_paths_dict, "gfa_editor_cli") else "bandage"
+    if renderer == "gfa_editor":
+        hfbase.require_soft_paths(soft_paths_dict, ["gfa_editor_cli"])
+    elif renderer == "bandage":
+        hfbase.require_soft_paths(soft_paths_dict, ["bandage"])
+        if output_format == "pdf":
+            output_format = "png"
+            settings["format"] = output_format
+    else:
+        raise ValueError("Unsupported GFA image renderer: " + renderer)
+
+    rows = []
+    outputs = []
+    for gfa_path in sorted(Path(".").glob("*.gfa")):
+        output_path = gfa_path.with_suffix("." + output_format)
+        if renderer == "gfa_editor":
+            _run_gfa_editor_image(gfa_path, output_path, genome_absolute_path, soft_paths_dict, settings)
+        else:
+            _run_bandage_image(gfa_path, output_path, genome_absolute_path, soft_paths_dict)
+        outputs.append(str(output_path))
+        rows.append({
+            "gfa": str(gfa_path),
+            "output": str(output_path),
+            "renderer": renderer,
+            "format": output_format,
+            "query": genome_absolute_path,
+            "colour": settings["colour"],
+            "layout": settings["layout"] or "default",
+            "width": settings["width"] or "default",
+            "height": settings["height"] or "default",
+            "labels": settings["labels"],
+            "target_role": settings["target_role"] or "default",
+            "alignment_tool": settings["alignment_tool"],
+            "alignment_args": settings.get("alignment_args", "."),
+            "status": "written",
+        })
+    _write_gfa_image_protocol("gfa_image_export_protocol.tsv", rows)
+    return outputs
+
+
+def get_gfa_reference_pdf(genome_absolute_path, soft_paths_dict):
+    return get_gfa_reference_images(
+        genome_absolute_path,
+        soft_paths_dict,
+        output_format="pdf",
+        renderer="gfa_editor",
+    )
+
+
 def get_gfa_blastn_png(genome_absolute_path, soft_paths_dict):
-    command_3 = "ls -1 *.gfa | while read i; do " + soft_paths_dict.get("bandage") + " image $i ${i%.gfa}.png --edgelen 25 --singlearr --depwidth 0.8 --colour blastsolid --query " + genome_absolute_path + "; done"
-    hfbase.run_checked(command_3)
-    return
+    return get_gfa_reference_images(
+        genome_absolute_path,
+        soft_paths_dict,
+        output_format="png",
+        renderer="bandage",
+    )
 
 
 def convert_blastn_alignments_to_table(blastn_alignments_file, output_file):

@@ -31,8 +31,11 @@ The Conda environment is pinned to Python 3.11; other Python versions may also
 work, but they have not been tested for this workflow.
 
 The workflow-facing external tools are `python`, `minimap2`, `samtools`,
-`seqkit`, `mecat`, `blastn`, `bcftools`, `bamtools`, `pigz`, `bandage`,
-`hifiasm`, `flye`, `canu`, and `simple_draft_asm`. The macOS example may also include legacy
+`seqkit`, `mecat`, `blastn`, `bcftools`, `bamtools`, `pigz`,
+`hifiasm`, `flye`, `canu`, and `simple_draft_asm`. Graph export requires at
+least one of `gfa_editor_cli` or `bandage`; the default draft workflow uses
+`gfa_editor_cli` for PDF graph export, while Bandage remains a legacy optional
+PNG path. The macOS example may also include legacy
 entries such as `meryl` and `winnowmap`; these are not required by the current
 W3-5-2 Snakemake workflow.
 
@@ -58,6 +61,7 @@ blastn	/path/to/blastn
 bcftools	/path/to/bcftools
 bamtools	/path/to/bamtools
 pigz	/path/to/pigz
+gfa_editor_cli	/path/to/GFA_Editor/scripts/gfa_editor_cli.py
 bandage	/path/to/Bandage
 hifiasm	/path/to/hifiasm
 flye	/path/to/flye

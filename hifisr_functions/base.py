@@ -24,11 +24,14 @@ REQUIRED_WORKFLOW_TOOLS = [
     "bcftools",
     "bamtools",
     "pigz",
-    "bandage",
     "hifiasm",
     "flye",
     "canu",
     "simple_draft_asm",
+]
+
+REQUIRED_WORKFLOW_TOOL_GROUPS = [
+    ["gfa_editor_cli", "bandage"],
 ]
 
 PYTHON_IMPORT_NAMES = {
@@ -47,6 +50,7 @@ FUNCTION_PURITY = {
     "load_soft_paths": "impure",
     "validate_soft_paths": "impure",
     "require_soft_paths": "impure",
+    "soft_path_tool_error": "impure",
     "parse_python_requirements": "impure",
     "check_python_packages": "impure",
 }
@@ -78,7 +82,13 @@ def get_file_lines(file):
     return lines
 
 
-def load_soft_paths(soft_paths_file, validate=False, required_tools=None, print_paths=True):
+def load_soft_paths(
+    soft_paths_file,
+    validate=False,
+    required_tools=None,
+    print_paths=True,
+    required_tool_groups=None,
+):
     soft_paths_dict = {}
     errors = []
     for line_number, line in enumerate(get_file_lines(soft_paths_file), start=1):
@@ -113,7 +123,12 @@ def load_soft_paths(soft_paths_file, validate=False, required_tools=None, print_
         )
 
     if validate:
-        validate_soft_paths(soft_paths_dict, required_tools, soft_paths_file)
+        validate_soft_paths(
+            soft_paths_dict,
+            required_tools,
+            soft_paths_file,
+            required_tool_groups=required_tool_groups,
+        )
 
     if print_paths:
         print("", file=sys.stderr)
@@ -129,26 +144,37 @@ def validate_soft_paths(
     required_tools=None,
     soft_paths_file="soft_paths.txt",
     check_all=True,
+    required_tool_groups=None,
 ):
     errors = []
-    tools_to_check = list(soft_paths_dict) if check_all else []
+    required_tool_groups = required_tool_groups or []
+    grouped_tools = set(tool for group in required_tool_groups for tool in group)
+    tools_to_check = [
+        tool
+        for tool in soft_paths_dict
+        if check_all and tool not in grouped_tools
+    ]
     for tool in required_tools or []:
         if tool not in tools_to_check:
             tools_to_check.append(tool)
 
     for tool in tools_to_check:
-        executable = soft_paths_dict.get(tool)
-        if not executable:
-            errors.append(f"{tool}: missing from {soft_paths_file}")
-            continue
+        error = soft_path_tool_error(soft_paths_dict, tool, soft_paths_file)
+        if error:
+            errors.append(error)
 
-        if os.path.isabs(executable):
-            if not os.path.exists(executable):
-                errors.append(f"{tool}: path does not exist: {executable}")
-            elif not os.access(executable, os.X_OK):
-                errors.append(f"{tool}: path is not executable: {executable}")
-        elif shutil.which(executable) is None:
-            errors.append(f"{tool}: command not found on PATH: {executable}")
+    for group in required_tool_groups:
+        group_errors = [
+            soft_path_tool_error(soft_paths_dict, tool, soft_paths_file)
+            for tool in group
+        ]
+        if all(group_errors):
+            errors.append(
+                "one of "
+                + ", ".join(group)
+                + " is required:\n    "
+                + "\n    ".join(group_errors)
+            )
 
     if errors:
         raise RuntimeError(
@@ -156,6 +182,21 @@ def validate_soft_paths(
             + "\n".join("  - " + error for error in errors)
         )
     return True
+
+
+def soft_path_tool_error(soft_paths_dict, tool, soft_paths_file="soft_paths.txt"):
+    executable = soft_paths_dict.get(tool)
+    if not executable:
+        return f"{tool}: missing from {soft_paths_file}"
+
+    if os.path.isabs(executable):
+        if not os.path.exists(executable):
+            return f"{tool}: path does not exist: {executable}"
+        if not os.access(executable, os.X_OK):
+            return f"{tool}: path is not executable: {executable}"
+    elif shutil.which(executable) is None:
+        return f"{tool}: command not found on PATH: {executable}"
+    return None
 
 
 def require_soft_paths(soft_paths_dict, required_tools):

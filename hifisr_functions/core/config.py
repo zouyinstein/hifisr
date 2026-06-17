@@ -7,6 +7,7 @@ existing workflow behavior remains unchanged.
 
 from hifisr_functions.base import (
     PYTHON_IMPORT_NAMES,
+    REQUIRED_WORKFLOW_TOOL_GROUPS,
     REQUIRED_WORKFLOW_TOOLS,
     check_python_packages,
     load_soft_paths,
@@ -27,6 +28,7 @@ FUNCTION_PURITY = {
 
 __all__ = [
     "PYTHON_IMPORT_NAMES",
+    "REQUIRED_WORKFLOW_TOOL_GROUPS",
     "REQUIRED_WORKFLOW_TOOLS",
     "check_python_packages",
     "load_soft_paths",

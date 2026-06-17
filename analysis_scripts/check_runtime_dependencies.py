@@ -48,6 +48,7 @@ def main(argv=None):
             args.soft_paths,
             validate=True,
             required_tools=hfbase.REQUIRED_WORKFLOW_TOOLS,
+            required_tool_groups=hfbase.REQUIRED_WORKFLOW_TOOL_GROUPS,
         )
         print(f"soft_paths check passed: {args.soft_paths}")
 

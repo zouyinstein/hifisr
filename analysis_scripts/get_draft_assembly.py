@@ -59,7 +59,7 @@ if not modes:
     print("No draft assembly modes were selected.", file=sys.stderr)
     sys.exit(1)
 
-required_tools = ["bandage", "simple_draft_asm"]
+required_tools = ["simple_draft_asm"]
 hfbase.require_soft_paths(soft_paths_dict, list(dict.fromkeys(required_tools)))
 
 
@@ -102,7 +102,7 @@ for mode in simple_draft_asm_modes:
 hfbase.run_checked("rm -f " + full_reads_link)
 
 gfa_outputs = list(dict.fromkeys(gfa_outputs))
-hfrps.get_gfa_blastn_png(genome_absolute_path, soft_paths_dict)
-expected_outputs = gfa_outputs + [gfa_file.replace(".gfa", ".png") for gfa_file in gfa_outputs]
+image_outputs = hfrps.get_gfa_reference_pdf(genome_absolute_path, soft_paths_dict)
+expected_outputs = gfa_outputs + image_outputs
 require_outputs(expected_outputs)
 os.chdir("../../..")

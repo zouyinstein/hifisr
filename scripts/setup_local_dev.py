@@ -32,6 +32,7 @@ SOFT_PATH_TOOLS = [
     "meryl",
     "winnowmap",
     "pigz",
+    "gfa_editor_cli",
     "bandage",
     "hifiasm",
     "flye",
@@ -49,6 +50,7 @@ LOCAL_SOFT_PATHS = {
     / "Contents"
     / "MacOS"
     / "Bandage",
+    "gfa_editor_cli": ROOT.parent.parent / "GFA_Editor" / "scripts" / "gfa_editor_cli.py",
     "hifiasm": ROOT / "deps" / "hifiasm-0.25.0" / "hifiasm",
     "canu": ROOT / "deps" / "canu-2.3" / "bin" / "canu",
 }

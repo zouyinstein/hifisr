@@ -13,6 +13,7 @@ blastn	/path/to/miniconda3/envs/hifisr/bin/blastn
 bcftools	/path/to/miniconda3/envs/hifisr/bin/bcftools
 bamtools	/path/to/miniconda3/envs/hifisr/bin/bamtools
 pigz	/path/to/miniconda3/envs/hifisr/bin/pigz
+gfa_editor_cli	/path/to/GFA_Editor/scripts/gfa_editor_cli.py
 bandage	/path/to/miniconda3/envs/hifisr/bin/Bandage
 hifiasm	/path/to/miniconda3/envs/hifisr/bin/hifiasm
 flye	/path/to/miniconda3/envs/hifisr/bin/flye
