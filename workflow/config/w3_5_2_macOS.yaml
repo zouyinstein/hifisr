@@ -4,9 +4,9 @@ sample: W3-5-2
 project_dir: "{snakefile_dir}"
 results_dir: "{project_dir}/results"
 
-reads: /Users/zouyinstein-m4max/Documents/Codex/hifisr-dev/data/W3-5-2.fastq.gz
+reads: /Users/zouyinstein-home/Documents/Codex/hifisr-dev/data/W3-5-2.fastq.gz
 
-soft_paths: "{project_dir}/deps/soft_paths_macOS.txt"
+soft_paths: "{project_dir}/deps/soft_paths_macOS_office.txt"
 
 genomes:
   - mito

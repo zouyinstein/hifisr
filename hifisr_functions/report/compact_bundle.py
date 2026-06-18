@@ -133,6 +133,13 @@ def format_float(value: float | None, digits: int = 2) -> str:
     return f"{value:.{digits}f}"
 
 
+def workflow_config_hint(base: Path) -> str:
+    sample = base.name
+    if sample == "W3-5-2":
+        return "workflow/config/w3_5_2_macOS.yaml"
+    return f"workflow/config/{sample.lower().replace('-', '_')}.yaml"
+
+
 def read_fasta_stats(path: Path) -> dict[str, Any]:
     stats: dict[str, Any] = {"records": 0, "length": None, "gc_percent": None}
     if not path.is_file():
@@ -632,24 +639,25 @@ def genome_input_rows(base: Path, reports_dir: Path, genome: str, cfg: dict[str,
 def genome_command_rows(base: Path, reports_dir: Path, genome: str, cfg: dict[str, str]) -> list[list[str]]:
     support_dir = base / "draft_assembly" / genome / "verified_gfa_read_support"
     run_dir = base / genome / cfg["run"]
+    config_file = workflow_config_hint(base)
     return [
         [
-            "<code>snakemake --snakefile Snakefile --configfile workflow/config/w3_5_2_gfa.yaml draft_for_manual_edit</code>",
+            f"<code>snakemake --snakefile Snakefile --configfile {html.escape(config_file)} draft_for_manual_edit</code>",
             "Generate draft GFA/PDF files for manual graph inspection.",
             "manual breakpoint",
         ],
         [
-            "<code>snakemake --snakefile Snakefile --configfile workflow/config/w3_5_2_gfa.yaml verified_gfa_read_support</code>",
+            f"<code>snakemake --snakefile Snakefile --configfile {html.escape(config_file)} verified_gfa_read_support</code>",
             "Build verified GFA outputs and node-coordinate projection tables.",
             html.escape(status_for(support_dir / f"{cfg['verified_prefix']}.gfa")),
         ],
         [
-            "<code>snakemake --snakefile Snakefile --configfile workflow/config/w3_5_2_gfa.yaml compact_report_bundle</code>",
+            f"<code>snakemake --snakefile Snakefile --configfile {html.escape(config_file)} compact_report_bundle</code>",
             "Generate the compact report and HTML browser.",
             html.escape(status_for(base / "reports" / genome / "index.html")),
         ],
         [
-            "<code>snakemake --snakefile Snakefile --configfile workflow/config/w3_5_2_gfa.yaml final</code>",
+            f"<code>snakemake --snakefile Snakefile --configfile {html.escape(config_file)} final</code>",
             "Run the full final target, including compact reports.",
             html.escape(status_for(run_dir / ".snakemake.done")),
         ],
@@ -702,6 +710,8 @@ def genome_status_rows(base: Path, reports_dir: Path) -> list[list[str]]:
 def write_project_index(base: Path, generated_at: datetime, elapsed_seconds: float) -> None:
     reports_dir = base / "reports"
     reports_dir.mkdir(parents=True, exist_ok=True)
+    sample = base.name
+    config_file = workflow_config_hint(base)
     meta_line = (
         '<p class="meta">'
         f"hifisr {html.escape(HIFISR_VERSION)} · "
@@ -728,11 +738,11 @@ def write_project_index(base: Path, generated_at: datetime, elapsed_seconds: flo
     workflow_rows = [
         ["Input", f"{link(reports_dir, base / 'reads', 'reads')} · checked draft GFA · rotated reference"],
         ["Manual", "checked draft graph; mito pos_ref_alt corrections"],
-        ["Run", "<code>snakemake --snakefile Snakefile --configfile workflow/config/w3_5_2_gfa.yaml final</code>"],
+        ["Run", f"<code>snakemake --snakefile Snakefile --configfile {html.escape(config_file)} final</code>"],
         ["Report", "<code>analysis_scripts/generate_compact_report_bundle.py</code> via Snakemake"],
     ]
     sections = [
-        "<h1>W3-5-2_gfa reports</h1>",
+        f"<h1>{html.escape(sample)} reports</h1>",
         '<p class="lead">Open a genome report first. Large evidence files stay linked in the project tree.</p>',
         "<h2>At A Glance</h2>",
         table(["Genome", "Final files", "Status", "Note"], genome_rows),
@@ -741,7 +751,7 @@ def write_project_index(base: Path, generated_at: datetime, elapsed_seconds: flo
         meta_line,
     ]
     body = "\n".join(sections)
-    (reports_dir / "index.html").write_text(html_page("W3-5-2_gfa project browser", body), encoding="utf-8")
+    (reports_dir / "index.html").write_text(html_page(f"{sample} project browser", body), encoding="utf-8")
     write_json(
         reports_dir / "project_manifest.json",
         {
@@ -1138,7 +1148,7 @@ def main() -> int:
     parser.add_argument(
         "--base",
         default="/Users/zouyinstein-home/Documents/Codex/hifisr-dev/hifisr/results/W3-5-2_gfa",
-        help="W3-5-2_gfa result directory.",
+        help="hifisr result directory.",
     )
     parser.add_argument(
         "--final-coverage-y-rule",
