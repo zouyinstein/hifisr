@@ -1,0 +1,2 @@
+env	hifisr_root	results_dir	python	soft_paths	threads	hifisr_tmpdir	mplconfigdir
+macOS	/Users/zouyinstein-m4max/Documents/Codex/hifisr-dev/hifisr	{hifisr_root}/results	{hifisr_root}/.venv/bin/python	{hifisr_root}/deps/soft_paths_manual.txt	8	{results_dir}/.tmp	{results_dir}/.matplotlib

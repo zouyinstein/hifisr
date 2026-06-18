@@ -1,0 +1,2 @@
+sample	raw_reads	mito_ref	plastid_ref	mito_read_limit	plastid_read_limit
+W3-5-2	/Users/zouyinstein-m4max/Documents/Codex/hifisr-dev/data/W3-5-2.fastq.gz	{hifisr_root}/references/mito_rotated_293434.fasta	{hifisr_root}/references/plastid_rotated_61049.fasta	50000	50000

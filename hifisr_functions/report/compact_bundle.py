@@ -87,6 +87,13 @@ def first_match(root: Path, pattern: str) -> Path | None:
     return matches[0] if matches else None
 
 
+def first_existing(paths: list[Path]) -> Path | None:
+    for path in paths:
+        if path.exists():
+            return path
+    return None
+
+
 def count_fasta(path: Path | None) -> int | None:
     if path is None or not path.is_file():
         return None
@@ -109,6 +116,15 @@ def format_int(value: int | None) -> str:
     if value is None:
         return "NA"
     return f"{value:,}"
+
+
+def format_maybe_int(value: Any) -> str:
+    if value is None or value == "":
+        return "NA"
+    try:
+        return f"{int(float(str(value).replace(',', ''))):,}"
+    except (TypeError, ValueError):
+        return str(value)
 
 
 def format_float(value: float | None, digits: int = 2) -> str:
@@ -451,22 +467,23 @@ def html_page(title: str, body: str) -> str:
             ".lead{color:#555;margin-top:0;}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;}",
             ".meta{font-size:13px;color:#666;margin:36px 0 0;white-space:nowrap;overflow-x:auto;}",
             ".card{background:#fff;border:1px solid #ddd;border-radius:8px;padding:14px 16px;}",
-            ".report-hero{display:grid;grid-template-columns:minmax(0,.82fr) minmax(0,1.18fr);gap:14px;margin:18px 0 4px;align-items:start;}",
+            ".report-hero{display:grid;grid-template-columns:minmax(0,.82fr) minmax(0,1.18fr);gap:14px;margin:18px 0 14px;align-items:start;}",
             ".hero-left{display:grid;grid-template-rows:auto auto;gap:14px;align-content:start;}",
             ".figure-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start;margin-top:16px;}",
             ".figure-card{background:#fff;border:1px solid #ddd;border-radius:8px;padding:10px;}",
             ".figure-card h3{display:flex;justify-content:space-between;gap:12px;font-size:14px;margin:0 0 8px;white-space:nowrap;}",
             ".figure-links{font-weight:500;color:#666;}",
             ".figure-card img{width:100%;height:340px;object-fit:contain;border:1px solid #e3e3e3;border-radius:6px;background:#fff;}",
-            ".figure-card.graph img{height:368px;}.figure-card.combined{align-self:start;}.figure-card.combined img{height:auto;display:block;}",
+            ".figure-card.graph img{height:487px;}.figure-card.combined{align-self:start;}.figure-card.combined img{height:auto;display:block;}",
             ".final-strip{display:block;margin:0;}",
             ".final-card{background:#fff;border:1px solid #ddd;border-radius:8px;padding:10px 12px;}",
-            ".final-card h3{font-size:14px;margin:0 0 6px;white-space:nowrap;}.final-card p{font-size:13px;color:#555;line-height:1.35;margin:3px 0;}",
+            ".final-stats-row{display:grid;grid-template-columns:1.15fr 1fr 1.2fr;gap:14px;align-items:start;}",
+            ".final-stat{min-width:0;}.final-stat h3{font-size:14px;margin:0 0 6px;white-space:nowrap;}.final-stat p{font-size:13px;color:#555;line-height:1.35;margin:3px 0;white-space:nowrap;}",
             ".final-card strong{color:#222;font-weight:650;}",
             ".evidence-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:24px;}",
             ".evidence-card{background:#fff;border:1px solid #ddd;border-radius:8px;padding:11px 12px;}",
-            ".evidence-card h3{font-size:14px;margin:0 0 6px;white-space:nowrap;}.evidence-card p{font-size:13px;color:#555;margin:0 0 8px;line-height:1.35;}",
-            ".evidence-links{font-size:13px;line-height:1.55;}",
+            ".evidence-card h3{font-size:14px;margin:0 0 6px;white-space:nowrap;}.evidence-card p{font-size:13px;color:#555;margin:0 0 8px;line-height:1.35;white-space:nowrap;}",
+            ".evidence-links{font-size:13px;line-height:1.55;white-space:nowrap;}",
             ".summary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}",
             ".summary-card{background:#fff;border:1px solid #ddd;border-radius:8px;padding:10px;}.summary-card h3{font-size:14px;margin:0 0 8px;white-space:nowrap;}",
             ".summary-card table{border:0;}.summary-card th,.summary-card td{padding:7px 8px;}",
@@ -475,7 +492,7 @@ def html_page(title: str, body: str) -> str:
             "img{max-width:100%;border:1px solid #ddd;background:#fff;border-radius:6px;}",
             ".tag{display:inline-block;font-size:12px;background:#e9f2ff;color:#164b83;border-radius:999px;padding:2px 8px;margin-left:6px;}",
             "@media(max-width:980px){.evidence-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}",
-            "@media(max-width:820px){.report-hero,.hero-left,.figure-grid,.summary-grid,.evidence-grid{grid-template-columns:1fr;}.figure-card img,.figure-card.graph img,.figure-card.combined img{height:240px;}}",
+            "@media(max-width:820px){.report-hero,.hero-left,.figure-grid,.summary-grid,.final-stats-row,.evidence-grid{grid-template-columns:1fr;}.figure-card img,.figure-card.graph img,.figure-card.combined img{height:240px;}.final-stat p{white-space:normal;}}",
             "</style>",
             "</head>",
             "<body><main>",
@@ -768,21 +785,45 @@ def write_genome_index(
 
     gfa_stats = read_gfa_stats(final_dir / "final.gfa")
     fasta_stats = read_fasta_stats(final_dir / "final.fasta")
+    sampling_summary = base / "reads" / "backup_info" / "downstream_read_sampling_summary.tsv"
+    sample_row = read_sampling_summary(base).get(genome, {})
+    run_type1_fl_hits = first_existing(
+        [
+            run_dir / "FL_read_group_files" / "type_1_subtype_NA_FL_blastn_results.txt",
+            run_dir / "backup_info" / "FL_read_group_files" / "type_1_subtype_NA_FL_blastn_results.txt",
+        ]
+    )
+    reads_count = sample_row.get("analysis_read_count") or sample_row.get("extracted_read_count")
+    fl_fasta_count = count_fasta(run_dir / "FL.fasta")
+    type1_fl_hit_count = count_lines(run_type1_fl_hits)
     final_stats_html = (
         '<section class="final-card">'
+        '<div class="final-stats-row">'
+        '<div class="final-stat">'
         "<h3>Final files</h3>"
         f"<p>{link(report_dir, final_dir / 'final.gfa', 'final.gfa')} · "
-        f"<strong>{format_int(gfa_stats['nodes'])}</strong> nodes · "
-        f"<strong>{format_int(gfa_stats['links'])}</strong> links</p>"
-        f"<p><strong>Topology</strong> · {html.escape(str(gfa_stats['topology']))}</p>"
-        f"<p>{link(report_dir, final_dir / 'final.fasta', 'final.fasta')} · "
-        f"<strong>{format_int(fasta_stats['length'])}</strong> bp · "
+        f"{link(report_dir, final_dir / 'final.fasta', 'final.fasta')}</p>"
+        f"<p><strong>{format_int(fasta_stats['length'])}</strong> bp · "
         f"<strong>{format_float(fasta_stats['gc_percent'])}%</strong> GC</p>"
+        "</div>"
+        '<div class="final-stat">'
+        "<h3>Topology</h3>"
+        f"<p><strong>{format_int(gfa_stats['nodes'])}</strong> nodes · "
+        f"<strong>{format_int(gfa_stats['links'])}</strong> links</p>"
+        f"<p>{html.escape(str(gfa_stats['topology']))}</p>"
+        "</div>"
+        '<div class="final-stat">'
+        f"<h3>Reads stats ({html.escape(cfg['run'])})</h3>"
+        f"<p>{link(report_dir, sampling_summary, 'sampling TSV')} · "
+        f"<strong>{html.escape(format_maybe_int(reads_count))}</strong> reads</p>"
+        f"<p><strong>{format_int(fl_fasta_count)}</strong> FL.fasta · "
+        f"<strong>{format_int(type1_fl_hit_count)}</strong> type_1 FL hits</p>"
+        "</div>"
+        "</div>"
         "</section>"
     )
     hero_html = (
         '<div class="report-hero">'
-        '<div class="hero-left">'
         + figure_card(
             report_dir,
             final_dir / "final_graph.svg",
@@ -790,8 +831,6 @@ def write_genome_index(
             "final_graph",
             "graph",
         )
-        + final_stats_html
-        + "</div>"
         + figure_card(
             report_dir,
             final_dir / "final_coverage_bubble.png",
@@ -800,75 +839,76 @@ def write_genome_index(
             "combined",
         )
         + "</div>"
+        + final_stats_html
     )
     draft_dir = base / "draft_assembly" / genome
     manual_graph_files = [
-        (draft_dir / f"{genome}_checked_draft.gfa", "checked GFA"),
-        (draft_dir / f"{genome}_checked_draft.pdf", "checked PDF"),
+        (draft_dir / f"{genome}_checked_draft.gfa", "GFA"),
+        (draft_dir / f"{genome}_checked_draft.pdf", "PDF"),
     ]
     correction_table = draft_dir / "pos_ref_alt.txt"
     if correction_table.exists():
-        manual_graph_files.append((correction_table, "corrections"))
+        manual_graph_files.append((correction_table, "correction"))
     evidence_cards = [
         evidence_card(
             report_dir,
             "Reads",
-            "Extracted organelle reads and sampling summary.",
+            "Reads and sampling summary.",
             base / "reads",
             [
-                (base / "reads" / f"{genome}.fastq.gz", f"{genome}.fastq.gz"),
-                (base / "reads" / "backup_info" / "downstream_read_sampling_summary.tsv", "sampling TSV"),
+                (base / "reads" / f"{genome}.fastq.gz", "reads"),
+                (base / "reads" / "backup_info" / "downstream_read_sampling_summary.tsv", "sampling"),
             ],
         ),
         evidence_card(
             report_dir,
             "Variant Run",
-            f"Final {cfg['run']} variant and coverage evidence.",
+            f"{cfg['run']} variants and coverage.",
             run_dir,
             [
-                (run_dir / "variants_anno_combined_depth_frq_filter.xlsx", "filtered variants"),
-                (run_dir / "FL_cov.txt", "FL_cov"),
-                (run_dir / "partial_cov.txt", "partial_cov"),
+                (run_dir / "variants_anno_combined_depth_frq_filter.xlsx", "variants"),
+                (run_dir / "FL_cov.txt", "FL"),
+                (run_dir / "partial_cov.txt", "partial"),
             ],
         ),
         evidence_card(
             report_dir,
             "Verified GFA",
-            "Graph, sequence, coordinate map, and node-split variants.",
+            "Graph, sequence, node map, variants.",
             support_dir,
             [
                 (support_dir / f"{prefix}.gfa", "GFA"),
                 (support_dir / f"{prefix}.fasta", "FASTA"),
                 (support_dir / f"{prefix}_linear_to_node_coordinate.tsv", "node map"),
-                (support_dir / "variant_by_nodes" / "variants_anno_combined_depth_frq_filter.by_verified_node.xlsx", "variants by node"),
+                (support_dir / "variant_by_nodes" / "variants_anno_combined_depth_frq_filter.by_verified_node.xlsx", "variants"),
             ],
         ),
         evidence_card(
             report_dir,
             "Manual Graph",
-            "Human-checked draft graph and optional correction table.",
+            "Checked graph and corrections.",
             draft_dir,
             manual_graph_files,
         ),
         evidence_card(
             report_dir,
             "Logs",
-            "Workflow and compact report run logs.",
+            "Workflow and report logs.",
             base / "logs" / "snakemake",
             [
-                (base / "logs" / "snakemake" / "compact_report_bundle.log", "report log"),
+                (base / "logs" / "snakemake" / "compact_report_bundle.log", "report"),
             ],
         ),
         evidence_card(
             report_dir,
             "Workflow",
-            "Inputs, manual checkpoint, final outputs, and report manifests.",
+            "Inputs, checkpoints, outputs, manifests.",
             metadata_dir,
             [
-                (genome_linear_fasta(base, genome, cfg), "linear FASTA"),
-                (draft_dir / f"{genome}_checked_draft.gfa", "checked draft"),
+                (genome_linear_fasta(base, genome, cfg), "linear"),
+                (draft_dir / f"{genome}_checked_draft.gfa", "draft"),
                 (metadata_dir / f"{prefix}_linear_to_node_coordinate.tsv", "node map"),
-                (metadata_dir / "report_manifest.json", "report manifest"),
+                (metadata_dir / "report_manifest.json", "manifest"),
             ],
         ),
     ]
