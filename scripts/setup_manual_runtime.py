@@ -155,6 +155,7 @@ def detect_gfa_editor_cli(args: argparse.Namespace) -> str | None:
         return from_path
     candidate = first_existing([
         sibling_project("GFA_Editor") / "scripts" / "gfa_editor_cli.py",
+        ROOT.parent / "GFA_Editor" / "scripts" / "gfa_editor_cli.py",
         Path("/Applications/GFA_Editor.app/Contents/MacOS/GFA_Editor"),
     ])
     return str(candidate) if candidate else None
@@ -468,6 +469,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--install-python-packages", action="store_true", help="Install Python packages for the manual workflow.")
     parser.add_argument("--build-simple-draft-asm", action="store_true", help="Run cargo build --release for simple_draft_asm.")
     parser.add_argument("--write-soft-paths", action="store_true", help="Write the soft_paths file.")
+    parser.add_argument(
+        "--write-soft-versions",
+        action="store_true",
+        help="Write soft_versions from the existing --soft-paths file.",
+    )
     parser.add_argument("--check", action="store_true", help="Check soft_paths and Python packages.")
     parser.add_argument("--dry-run", action="store_true", help="Print install/build commands without executing them.")
     parser.add_argument("--soft-paths", default="deps/soft_paths_manual.txt", help="soft_paths output/check file.")
@@ -489,6 +495,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         ),
     )
     args = parser.parse_args(argv)
+    soft_versions_was_set = bool(args.soft_versions)
     args.tool_overrides = parse_tool_overrides(args.tool, parser)
 
     if not any([
@@ -497,10 +504,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         args.install_python_packages,
         args.build_simple_draft_asm,
         args.write_soft_paths,
+        args.write_soft_versions,
         args.check,
     ]):
-        args.write_soft_paths = True
-        args.check = True
+        if soft_versions_was_set:
+            args.write_soft_versions = True
+        else:
+            args.write_soft_paths = True
+            args.check = True
 
     args.soft_paths = Path(args.soft_paths)
     if not args.soft_paths.is_absolute():
@@ -534,6 +545,11 @@ def main(argv: list[str] | None = None) -> int:
         missing = [tool for tool in REQUIRED_TOOLS if tool not in tools]
         if missing:
             print("Missing from generated soft_paths: " + ", ".join(missing))
+
+    if args.write_soft_versions and not args.write_soft_paths:
+        tools = read_soft_paths(args.soft_paths)
+        write_soft_versions(args.soft_versions, tools)
+        print(f"Wrote {args.soft_versions}")
 
     if args.check:
         errors = []
