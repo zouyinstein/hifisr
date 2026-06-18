@@ -79,7 +79,7 @@ VERSION_ARGS = {
     "pigz": ["--version"],
     "flye": ["--version"],
     "simple_draft_asm": ["--version"],
-    "gfa_editor_cli": ["--version"],
+    "gfa_editor_cli": ["--help"],
 }
 
 
@@ -263,7 +263,7 @@ def infer_gfa_editor_version(path: str) -> tuple[str, str]:
             git_rev = completed.stdout.strip()
         parts = []
         if version:
-            parts.append("version " + version)
+            parts.append("GFA_Editor version " + version)
         if git_rev:
             parts.append("git " + git_rev)
         if parts:
@@ -287,15 +287,18 @@ def tool_version(tool: str, path: str, python_path: str | None) -> tuple[str, st
         return command_text, str(exc), "error"
 
     output = clean_version_text(completed.stdout + "\n" + completed.stderr)
+    if tool == "gfa_editor_cli":
+        inferred, status = infer_gfa_editor_version(path)
+        if inferred:
+            return command_text, inferred, status
+        if completed.returncode == 0 and output:
+            return command_text, output, "ok"
+
     if completed.returncode == 0 and output:
         return command_text, output, "ok"
 
     if tool == "simple_draft_asm":
         inferred, status = infer_simple_draft_asm_version(path)
-        if inferred:
-            return command_text, inferred, status
-    if tool == "gfa_editor_cli":
-        inferred, status = infer_gfa_editor_version(path)
         if inferred:
             return command_text, inferred, status
 
